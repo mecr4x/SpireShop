@@ -1,12 +1,17 @@
-import asyncio
-import logging
+## main.py - рабочий код с проверкой TON и удалением сообщений
 import sys
-import sqlite3
-import re
+import asyncio
+
+# Для Windows
+if sys.platform == 'win32':
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+import logging
+import time
+
 import aiohttp
-import json
+import re
 from aiogram import Bot, Dispatcher, Router, F, types
-from aiogram.types import Message, CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, FSInputFile
+from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, FSInputFile
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -14,473 +19,132 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.client.default import DefaultBotProperties
 
 # ===== КОНФИГУРАЦИЯ =====
-BOT_TOKEN = "8236812443:AAGsoEmE7u9q5eBpKTQ3vlbp4IregP9-oHY"  # ВСТАВЬТЕ ТОКЕН
+BOT_TOKEN = "8236812443:AAGsoEmE7u9q5eBpKTQ3vlbp4IregP9-oHY"
 ADMIN_CHANNEL = '@spireshop01'
 SUPPORT_USERNAME = '@adamyan_ss'
 TON_WALLET = 'UQAL5Y75ykdUsMmW5FgnxKJyz1-njyS_oNuN1Lp2_hgNundO'
 
-# Хранилище ID сообщений для удаления
-user_messages = {}
-
-
-# ===== ФУНКЦИИ ДЛЯ УДАЛЕНИЯ СООБЩЕНИЙ =====
-async def save_message_id(user_id: int, message_id: int):
-    """Сохранить ID сообщения для последующего удаления"""
-    if user_id not in user_messages:
-        user_messages[user_id] = []
-    user_messages[user_id].append(message_id)
-
-
-async def delete_previous_messages(user_id: int):
-    """Удалить предыдущие сообщения бота у пользователя"""
-    if user_id in user_messages:
-        for msg_id in user_messages[user_id]:
-            try:
-                await bot.delete_message(chat_id=user_id, message_id=msg_id)
-            except:
-                pass
-        user_messages[user_id] = []
-
-
-async def send_with_deletion(user_id: int, text: str = None, photo=None,
-                             caption: str = None, reply_markup=None, delete_previous: bool = True):
-    """Отправить сообщение с удалением предыдущих"""
-    if delete_previous:
-        await delete_previous_messages(user_id)
-
-    if photo:
-        msg = await bot.send_photo(
-            chat_id=user_id,
-            photo=photo,
-            caption=caption,
-            reply_markup=reply_markup
-        )
-    else:
-        msg = await bot.send_message(
-            chat_id=user_id,
-            text=text,
-            reply_markup=reply_markup
-        )
-
-    await save_message_id(user_id, msg.message_id)
-    return msg
-
-
-async def edit_with_deletion(callback: CallbackQuery, text: str = None, photo=None,
-                             caption: str = None, reply_markup=None):
-    """Редактировать сообщение с обновлением"""
-    try:
-        if photo:
-            await callback.message.edit_media(
-                media=types.InputMediaPhoto(media=photo, caption=caption),
-                reply_markup=reply_markup
-            )
-        else:
-            await callback.message.edit_text(
-                text=text,
-                reply_markup=reply_markup
-            )
-    except:
-        # Если не удалось редактировать, отправляем новое
-        await delete_previous_messages(callback.from_user.id)
-        await send_with_deletion(
-            user_id=callback.from_user.id,
-            text=text or caption,
-            photo=photo,
-            reply_markup=reply_markup,
-            delete_previous=False
-        )
-
-
-# ===== ФУНКЦИЯ ПРОВЕРКИ ЮЗЕРНЕЙМА =====
-async def check_username_exists(username: str) -> dict:
-    """
-    Проверяет существование юзернейма в Telegram
-    Возвращает: {'exists': bool, 'reason': str, 'user_id': int or None}
-    """
-    try:
-        # Пытаемся получить информацию о пользователе
-        chat = await bot.get_chat(f"@{username}")
-
-        # Проверяем, что это пользователь, а не группа/канал
-        if chat.type != "private":
-            return {
-                'exists': False,
-                'reason': 'Это не пользователь (группа или канал)',
-                'user_id': None
-            }
-
-        # Проверяем, является ли это самим ботом
-        if chat.id == (await bot.get_me()).id:
-            return {
-                'exists': False,
-                'reason': 'Это сам бот',
-                'user_id': chat.id
-            }
-
-        return {
-            'exists': True,
-            'reason': 'Пользователь найден',
-            'user_id': chat.id
-        }
-
-    except Exception as e:
-        error_msg = str(e).lower()
-
-        if any(x in error_msg for x in ['not found', 'no user', 'invalid', 'username not occupied']):
-            return {
-                'exists': False,
-                'reason': 'Пользователь не найден',
-                'user_id': None
-            }
-        elif 'bot was blocked' in error_msg or 'user is deactivated' in error_msg:
-            return {
-                'exists': True,  # Пользователь существует, но заблокировал бота
-                'reason': 'Пользователь заблокировал бота или аккаунт деактивирован',
-                'user_id': None
-            }
-        else:
-            # Другие ошибки (например, проблемы с сетью)
-            return {
-                'exists': False,
-                'reason': f'Ошибка проверки: {str(e)[:50]}',
-                'user_id': None
-            }
-
-
-# ===== ФУНКЦИЯ ПРОВЕРКИ TON АДРЕСА =====
-async def check_ton_address(address: str) -> dict:
-    """
-    Проверяет валидность и существование TON-адреса
-    Возвращает: {'valid': bool, 'exists': bool, 'reason': str, 'balance': float or None}
-    """
-    try:
-        # Очищаем адрес от пробелов
-        address = address.strip()
-        
-        # Базовые проверки формата TON-адреса
-        if not address:
-            return {
-                'valid': False,
-                'exists': False,
-                'reason': 'Адрес не может быть пустым',
-                'balance': None
-            }
-        
-        # Проверка длины (обычно TON адрес имеет определенную длину)
-        if len(address) < 48 or len(address) > 64:
-            return {
-                'valid': False,
-                'exists': False,
-                'reason': 'Некорректная длина адреса',
-                'balance': None
-            }
-        
-        # Проверка на наличие недопустимых символов
-        if not re.match(r'^[a-zA-Z0-9_-]+$', address):
-            return {
-                'valid': False,
-                'exists': False,
-                'reason': 'Адрес содержит недопустимые символы',
-                'balance': None
-            }
-        
-        # Проверка через публичный API TON
-        async with aiohttp.ClientSession() as session:
-            try:
-                # API TON Center для проверки баланса и существования адреса
-                url = f'https://toncenter.com/api/v2/getAddressInformation?address={address}'
-                
-                async with session.get(url, timeout=10) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        
-                        # Проверяем наличие ошибок в ответе
-                        if data.get('ok'):
-                            balance_nano = data.get('result', {}).get('balance', 0)
-                            balance_ton = int(balance_nano) / 1_000_000_000
-                            
-                            # Адрес существует если мы получили информацию о нем
-                            return {
-                                'valid': True,
-                                'exists': True,
-                                'reason': 'Адрес существует и активен',
-                                'balance': balance_ton
-                            }
-                        else:
-                            # Адрес не найден или невалидный
-                            return {
-                                'valid': False,
-                                'exists': False,
-                                'reason': 'Адрес не найден в сети TON',
-                                'balance': None
-                            }
-                    else:
-                        # Пробуем альтернативный метод
-                        return await check_ton_address_alternative(session, address)
-                        
-            except aiohttp.ClientError as e:
-                # В случае ошибки сети, делаем базовую проверку формата
-                if address.startswith('UQ') or address.startswith('EQ'):
-                    return {
-                        'valid': True,
-                        'exists': True,  # Предполагаем что существует
-                        'reason': 'Формат адреса корректный (проверка сети недоступна)',
-                        'balance': None
-                    }
-                else:
-                    return {
-                        'valid': False,
-                        'exists': False,
-                        'reason': f'Ошибка проверки: {str(e)[:50]}',
-                        'balance': None
-                    }
-            except asyncio.TimeoutError:
-                # Таймаут - делаем только базовую проверку
-                if address.startswith(('UQ', 'EQ', '0:')):
-                    return {
-                        'valid': True,
-                        'exists': True,  # Предполагаем что существует
-                        'reason': 'Формат адреса корректный (проверка таймаут)',
-                        'balance': None
-                    }
-                else:
-                    return {
-                        'valid': False,
-                        'exists': False,
-                        'reason': 'Таймаут при проверке адреса',
-                        'balance': None
-                    }
-    
-    except Exception as e:
-        # Общая ошибка
-        return {
-            'valid': False,
-            'exists': False,
-            'reason': f'Ошибка: {str(e)[:50]}',
-            'balance': None
-        }
-
-
-async def check_ton_address_alternative(session: aiohttp.ClientSession, address: str) -> dict:
-    """Альтернативный метод проверки TON адреса"""
-    try:
-        # Проверка через tonapi.io
-        url = f'https://tonapi.io/v1/account/getInfo?account={address}'
-        
-        async with session.get(url, timeout=10) as response:
-            if response.status == 200:
-                data = await response.json()
-                
-                # Если есть поле 'balance', значит адрес существует
-                if 'balance' in data:
-                    balance_nano = data.get('balance', 0)
-                    balance_ton = int(balance_nano) / 1_000_000_000
-                    
-                    return {
-                        'valid': True,
-                        'exists': True,
-                        'reason': 'Адрес существует и активен',
-                        'balance': balance_ton
-                    }
-                else:
-                    # Проверяем формат адреса локально
-                    if re.match(r'^(UQ|EQ|0:)[a-zA-Z0-9_-]{44,}$', address):
-                        return {
-                            'valid': True,
-                            'exists': True,  # Предполагаем существование
-                            'reason': 'Формат адреса корректный',
-                            'balance': None
-                        }
-                    else:
-                        return {
-                            'valid': False,
-                            'exists': False,
-                            'reason': 'Некорректный формат TON адреса',
-                            'balance': None
-                        }
-            else:
-                # Последняя попытка - проверка формата
-                if re.match(r'^(UQ|EQ|0:)[a-zA-Z0-9_-]{44,}$', address):
-                    return {
-                        'valid': True,
-                        'exists': True,  # Предполагаем существование
-                        'reason': 'Формат адреса корректный (API недоступен)',
-                        'balance': None
-                    }
-                else:
-                    return {
-                        'valid': False,
-                        'exists': False,
-                        'reason': 'Некорректный формат TON адреса',
-                        'balance': None
-                    }
-    except:
-        # Финальная проверка формата
-        if re.match(r'^(UQ|EQ|0:)[a-zA-Z0-9_-]{44,}$', address):
-            return {
-                'valid': True,
-                'exists': True,  # Предполагаем существование
-                'reason': 'Формат адреса корректный',
-                'balance': None
-            }
-        else:
-            return {
-                'valid': False,
-                'exists': False,
-                'reason': 'Некорректный формат TON адреса',
-                'balance': None
-            }
-
-
 # ===== ИНИЦИАЛИЗАЦИЯ =====
-bot = Bot(
-    token=BOT_TOKEN,
-    default=DefaultBotProperties(parse_mode="HTML")
-)
-storage = MemoryStorage()
-dp = Dispatcher(storage=storage)
+bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode="HTML"))
+dp = Dispatcher(storage=MemoryStorage())
 router = Router()
 dp.include_router(router)
 
+# ===== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ =====
+TON_RUB = 140
 
-# ===== СОСТОЯНИЯ (FSM) =====
+# ===== ХРАНИЛИЩЕ ДЛЯ УДАЛЕНИЯ СООБЩЕНИЙ =====
+user_messages = {}
+async def save_and_delete_previous(user_id: int, new_message_id: int):
+    """Сохранить новое сообщение и удалить старое"""
+    if user_id not in user_messages:
+        user_messages[user_id] = []
+
+    # Удаляем предыдущее сообщение если есть
+    if user_messages[user_id]:
+        try:
+            old_message_id = user_messages[user_id][-1]
+            await bot.delete_message(chat_id=user_id, message_id=old_message_id)
+        except:
+            pass
+
+    # Сохраняем новое
+    user_messages[user_id].append(new_message_id)
+
+    # Храним только последние 3 сообщения
+    if len(user_messages[user_id]) > 3:
+        user_messages[user_id] = user_messages[user_id][-3:]
+
+
+async def delete_user_message(user_id: int, message_id: int):
+    """Удалить конкретное сообщение"""
+    try:
+        await bot.delete_message(chat_id=user_id, message_id=message_id)
+        if user_id in user_messages and message_id in user_messages[user_id]:
+            user_messages[user_id].remove(message_id)
+    except:
+        pass
+
+
+# ===== СОСТОЯНИЯ =====
 class Form(StatesGroup):
-    waiting_for_stars = State()
-    waiting_for_ton_amount = State()
-    waiting_for_ton_address = State()
+    waiting_for_stars_amount = State()
     waiting_for_friend_username = State()
+    waiting_for_ton_address = State()
+    waiting_for_ton_amount = State()
     waiting_for_premium_friend = State()
 
 
-# ===== УЛУЧШЕННОЕ ХРАНИЛИЩЕ ДАННЫХ =====
-class UserData:
-    """Класс для хранения данных пользователя"""
-    _instance = None
-    
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-            cls._instance.data = {}
-        return cls._instance
-    
-    def set_premium_data(self, user_id: int, period: str, price: float, prem_ton: float):
-        """Сохранить данные о Premium"""
-        if user_id not in self.data:
-            self.data[user_id] = {}
-        self.data[user_id]['premium'] = {
-            'period': period,
-            'price': price,
-            'prem_ton': prem_ton
-        }
-    
-    def get_premium_data(self, user_id: int):
-        """Получить данные о Premium"""
-        if user_id in self.data and 'premium' in self.data[user_id]:
-            return self.data[user_id]['premium']
-        return None
-    
-    def set_stars_data(self, user_id: int, star_value: int, formulastar: float, star_ton: float):
-        """Сохранить данные о Stars"""
-        if user_id not in self.data:
-            self.data[user_id] = {}
-        self.data[user_id]['stars'] = {
-            'star_value': star_value,
-            'formulastar': formulastar,
-            'star_ton': star_ton
-        }
-    
-    def get_stars_data(self, user_id: int):
-        """Получить данные о Stars"""
-        if user_id in self.data and 'stars' in self.data[user_id]:
-            return self.data[user_id]['stars']
-        return None
-    
-    def set_ton_data(self, user_id: int, address: str):
-        """Сохранить данные о TON"""
-        if user_id not in self.data:
-            self.data[user_id] = {}
-        self.data[user_id]['ton'] = {
-            'address': address
-        }
-    
-    def get_ton_data(self, user_id: int):
-        """Получить данные о TON"""
-        if user_id in self.data and 'ton' in self.data[user_id]:
-            return self.data[user_id]['ton']
-        return None
-    
-    def clear_user_data(self, user_id: int):
-        """Очистить данные пользователя"""
-        if user_id in self.data:
-            del self.data[user_id]
+# ===== ХРАНИЛИЩЕ ДАННЫХ =====
+user_data = {}
 
 
-user_data = UserData()
+def save_user_data(user_id, key, value):
+    if user_id not in user_data:
+        user_data[user_id] = {}
+    user_data[user_id][key] = value
 
 
-# ===== БАЗА ДАННЫХ =====
-class Database:
-    def __init__(self):
-        self.conn = sqlite3.connect('bot_database.db', check_same_thread=False)
-        self.cursor = self.conn.cursor()
-        self.create_tables()
-
-    def create_tables(self):
-        self.cursor.execute('''
-            CREATE TABLE IF NOT EXISTS users (
-                user_id INTEGER PRIMARY KEY,
-                username TEXT,
-                subscribed INTEGER DEFAULT 0,
-                registration_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
-        self.conn.commit()
-
-    def add_user(self, user_id, username):
-        self.cursor.execute('INSERT OR IGNORE INTO users (user_id, username) VALUES (?, ?)',
-                            (user_id, username))
-        self.conn.commit()
-
-    def update_subscription(self, user_id, subscribed):
-        self.cursor.execute('UPDATE users SET subscribed = ? WHERE user_id = ?',
-                            (subscribed, user_id))
-        self.conn.commit()
+def get_user_data(user_id, key):
+    return user_data.get(user_id, {}).get(key)
 
 
-db = Database()
-
-
-# ===== ФУНКЦИИ ДЛЯ ИЗОБРАЖЕНИЙ =====
-def get_photo(filename):
-    """Получить фото из папки или использовать заглушку"""
-    try:
-        return FSInputFile(f"images/{filename}")
-    except:
-        return "https://via.placeholder.com/600x300/0088cc/FFFFFF?text=Spire+Shop"
-
-
-# ===== ФУНКЦИЯ ПРОВЕРКИ ПОДПИСКИ =====
-async def check_user_subscription(user_id: int) -> bool:
-    """Проверка подписки на канал"""
-    try:
-        chat_member = await bot.get_chat_member(chat_id=ADMIN_CHANNEL, user_id=user_id)
-        is_subscribed = chat_member.status in ['member', 'administrator', 'creator']
-        return is_subscribed
-    except Exception as e:
-        print(f"❌ Ошибка проверки подписки: {e}")
+# ===== ФУНКЦИИ ДЛЯ TON =====
+def is_valid_ton_format(address: str) -> bool:
+    """Проверка формата адреса TON"""
+    if not address or not isinstance(address, str):
         return False
 
+    address = address.strip()
 
-# ===== ОСНОВНЫЕ КОМАНДЫ =====
+    # Проверка длины
+    if len(address) < 48 or len(address) > 67:
+        return False
+
+    # Проверка префиксов
+    valid_prefixes = ['UQ', 'EQ', 'kQ', '0Q']
+    return any(address.startswith(prefix) for prefix in valid_prefixes)
+
+
+async def check_ton_address_exists(address: str) -> tuple[bool, str]:
+    """Проверка существования адреса TON через API"""
+    try:
+        async with aiohttp.ClientSession() as session:
+            # Используем TonCenter API
+            url = "https://toncenter.com/api/v2/getAddressInformation"
+            params = {"address": address}
+
+            async with session.get(url, params=params, timeout=10) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    if data.get("ok"):
+                        return True, "✅ Адрес существует и валиден"
+                    else:
+                        return False, "❌Указанный вами адрес не корректен"
+                else:
+                    return False, "❌Указанный вами адрес не корректен"
+    except Exception as e:
+        return False, f"❌ Ошибка сети: {str(e)}"
+
+
+async def get_ton_price():
+    """Получение курса TON"""
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                    'https://api.coingecko.com/api/v3/simple/price?ids=the-open-network&vs_currencies=rub',
+                    timeout=5
+            ) as response:
+                data = await response.json()
+                return data['the-open-network']['rub']
+    except:
+        return 140
+
+
+# ===== КОМАНДА /START =====
 @router.message(Command("start"))
-async def cmd_start(message: Message):
-    user_id = message.from_user.id
-    username = message.from_user.username or message.from_user.first_name
-
-    db.add_user(user_id, username)
-
-    welcome_text = (
+async def start_cmd(message: Message):
+    text = (
         "Добро пожаловать!\n\n"
         "Spire — магазин для покупки Telegram Stars, TON и Premium "
         "дешевле, чем в приложении и без верификации.\n\n"
@@ -489,92 +153,58 @@ async def cmd_start(message: Message):
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="Подписаться на канал", url=f"https://t.me/{ADMIN_CHANNEL[1:]}")],
-        [InlineKeyboardButton(text="✅ Проверить Подписку", callback_data="check_subscription")]
+        [InlineKeyboardButton(text="✅ Проверить Подписку", callback_data="check_sub")]
     ])
 
-    photo = get_photo("start.jpg")
+    try:
+        photo = FSInputFile("images/start.jpg")
+        sent_message = await message.answer_photo(photo=photo, caption=text, reply_markup=keyboard)
+    except:
+        sent_message = await message.answer(text, reply_markup=keyboard)
 
-    await send_with_deletion(
-        user_id=user_id,
-        text=welcome_text if not photo else None,
-        photo=photo,
-        caption=welcome_text if photo else None,
-        reply_markup=keyboard
-    )
+    await save_and_delete_previous(message.from_user.id, sent_message.message_id)
 
 
-@router.callback_query(F.data == "check_subscription")
-async def check_subscription_callback(callback: CallbackQuery):
-    user_id = callback.from_user.id
+# ===== ПРОВЕРКА ПОДПИСКИ =====
+@router.callback_query(F.data == "check_sub")
+async def check_sub(callback: CallbackQuery):
+    # Удаляем сообщение с кнопкой
+    await delete_user_message(callback.from_user.id, callback.message.message_id)
 
-    # Показываем "Проверяем..."
-    await edit_with_deletion(
-        callback=callback,
-        caption="🔍 Проверяем подписку..."
-    )
+    # Отправляем подтверждение
+    confirm_msg = await callback.message.answer("✅ Подписка подтверждена!")
+    await save_and_delete_previous(callback.from_user.id, confirm_msg.message_id)
 
-    # Ждем немного для визуального эффекта
-    await asyncio.sleep(0.5)
-
-    # Проверяем подписку
-    is_subscribed = await check_user_subscription(user_id)
-
-    if is_subscribed:
-        db.update_subscription(user_id, 1)
-        # Очищаем старые данные пользователя
-        user_data.clear_user_data(user_id)
-        # Сразу переходим в меню
-        await show_menu(callback)
-    else:
-        await edit_with_deletion(
-            callback=callback,
-            caption="❌ Вы не подписаны на канал!",
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="Подписаться на канал", url=f"https://t.me/{ADMIN_CHANNEL[1:]}")],
-                [InlineKeyboardButton(text="✅ Проверить снова", callback_data="check_subscription")]
-            ])
-        )
+    # Показываем меню
+    await asyncio.sleep(1)
+    await menu_cmd(callback.message)
+    await callback.answer()
 
 
-async def show_menu(callback: CallbackQuery = None, message: Message = None):
-    """Показ меню с автоудалением"""
+# ===== КОМАНДА /MENU =====
+@router.message(Command("menu"))
+async def menu_cmd(message: Message):
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="⭐️ Купить звёзды", callback_data="buy_stars")],
-        [InlineKeyboardButton(text="💎 Купить TON", callback_data="buy_ton")],
-        [InlineKeyboardButton(text="👑 Купить Premium", callback_data="buy_premium")],
+        [InlineKeyboardButton(text="⭐️ Купить звёзды", callback_data="stars")],
+        [InlineKeyboardButton(text="💎 Купить TON", callback_data="ton")],
+        [InlineKeyboardButton(text="👑 Купить Premium", callback_data="premium")],
         [InlineKeyboardButton(text="🆘 Поддержка", url=f"https://t.me/{SUPPORT_USERNAME[1:]}")]
     ])
 
-    photo = get_photo("menu.jpg")
+    try:
+        photo = FSInputFile("images/menu.jpg")
+        sent_message = await message.answer_photo(photo=photo, reply_markup=keyboard)
+    except:
+        sent_message = await message.answer(reply_markup=keyboard)
 
-    if callback:
-        await edit_with_deletion(
-            callback=callback,
-            photo=photo,
-            caption=" ",  # Пустой текст
-            reply_markup=keyboard
-        )
-    else:
-        await send_with_deletion(
-            user_id=message.from_user.id,
-            photo=photo,
-            caption=" ",  # Пустой текст
-            reply_markup=keyboard
-        )
+    await save_and_delete_previous(message.from_user.id, sent_message.message_id)
 
 
-@router.callback_query(F.data == "menu")
-@router.message(Command("menu"))
-async def menu_command(callback: CallbackQuery = None, message: Message = None):
-    if callback:
-        await show_menu(callback=callback)
-    else:
-        await show_menu(message=message)
+# ===== КОМАНДА /STARS =====
+@router.message(Command("stars"))
+async def stars_cmd(message: Message, state: FSMContext):
+    await state.clear()
 
-
-# ===== ПОКУПКА ЗВЕЗД =====
-@router.callback_query(F.data == "buy_stars")
-async def buy_stars(callback: CallbackQuery, state: FSMContext):
     text = (
         "⭐️Telegram Stars\n\n"
         "💰Курс к рублю: 1.7₽\n"
@@ -587,488 +217,424 @@ async def buy_stars(callback: CallbackQuery, state: FSMContext):
         [InlineKeyboardButton(text="Назад", callback_data="menu")]
     ])
 
-    photo = get_photo("stars.jpg")
-
-    await edit_with_deletion(
-        callback=callback,
-        photo=photo,
-        caption=text,
-        reply_markup=keyboard
-    )
-
-    await state.set_state(Form.waiting_for_stars)
-
-
-@router.message(Form.waiting_for_stars)
-async def process_stars_amount(message: Message, state: FSMContext):
     try:
-        star_value = int(message.text)
+        photo = FSInputFile("images/stars.jpg")
+        sent_message = await message.answer_photo(photo=photo, caption=text, reply_markup=keyboard)
+    except:
+        sent_message = await message.answer(text, reply_markup=keyboard)
 
-        # Удаляем сообщение пользователя
-        try:
-            await bot.delete_message(chat_id=message.chat.id, message_id=message.message_id)
-        except:
-            pass
+    await save_and_delete_previous(message.from_user.id, sent_message.message_id)
+    await state.set_state(Form.waiting_for_stars_amount)
+
+
+# ===== ОБРАБОТКА КОЛИЧЕСТВА ЗВЁЗД =====
+@router.message(Form.waiting_for_stars_amount)
+async def process_stars_amount(message: Message, state: FSMContext):
+    # Удаляем сообщение пользователя
+    await delete_user_message(message.from_user.id, message.message_id)
+
+    try:
+        star_value = int(message.text.strip())
 
         if star_value < 50 or star_value > 1000000:
-            await send_with_deletion(
-                user_id=message.from_user.id,
-                text="❌ Количество должно быть от 50 до 1,000,000"
-            )
+            error_msg = await message.answer("❌ Количество должно быть от 50 до 1,000,000")
+            await save_and_delete_previous(message.from_user.id, error_msg.message_id)
+            await asyncio.sleep(2)
+            await delete_user_message(message.from_user.id, error_msg.message_id)
             return
 
+        # Расчет стоимости
         formulastar = round(star_value * 1.7, 1)
-        star_ton = round(formulastar / 200, 4)
 
-        # Сохраняем данные в надежное хранилище
-        user_data.set_stars_data(message.from_user.id, star_value, formulastar, star_ton)
+        # Сохраняем данные
+        save_user_data(message.from_user.id, "stars", {
+            'star_value': star_value,
+            'formulastar': formulastar,
+        })
 
         text = (
             f"⭐️Telegram Stars\n\n"
             f"❗️Количество: {star_value}\n"
-            f"💰 Стоимость: {formulastar}₽ / {star_ton} TON\n\n"
+            f"💰 Стоимость: {formulastar}₽\n\n"
             f"Для кого вы приобретаете:"
         )
 
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="💫 Купить себе", callback_data="buy_stars_self")],
             [InlineKeyboardButton(text="🎁 Подарить другу", callback_data="gift_stars_friend")],
-            [InlineKeyboardButton(text="Назад", callback_data="buy_stars")]
+            [InlineKeyboardButton(text="Назад", callback_data="stars")]
         ])
 
-        photo = get_photo("stars.jpg")
+        try:
+            sent_message = await message.answer_photo(caption=text, reply_markup=keyboard)
+        except:
+            sent_message = await message.answer(text, reply_markup=keyboard)
 
-        await send_with_deletion(
-            user_id=message.from_user.id,
-            photo=photo,
-            caption=text,
-            reply_markup=keyboard
-        )
-
+        await save_and_delete_previous(message.from_user.id, sent_message.message_id)
         await state.clear()
 
     except ValueError:
-        # Удаляем сообщение пользователя
-        try:
-            await bot.delete_message(chat_id=message.chat.id, message_id=message.message_id)
-        except:
-            pass
+        error_msg = await message.answer("❌ Пожалуйста, введите корректное число")
+        await save_and_delete_previous(message.from_user.id, error_msg.message_id)
+        await asyncio.sleep(2)
+        await delete_user_message(message.from_user.id, error_msg.message_id)
 
-        await send_with_deletion(
-            user_id=message.from_user.id,
-            text="❌ Пожалуйста, введите корректное число"
-        )
-
-
+# ===== КНОПКА "КУПИТЬ СЕБЕ" =====
 @router.callback_query(F.data == "buy_stars_self")
-async def buy_stars_self(callback: CallbackQuery):
+async def buy_stars_self_callback(callback: CallbackQuery):
     user_id = callback.from_user.id
-    
-    # Получаем данные из надежного хранилища
-    stars_data = user_data.get_stars_data(user_id)
-    
+    stars_data = get_user_data(user_id, "stars")
+
     if not stars_data:
-        await callback.answer("❌ Сначала введите количество звезд", show_alert=True)
-        await buy_stars(callback, None)
-        return
-    
-    star_value = stars_data.get('star_value', 0)
-    formulastar = stars_data.get('formulastar', 0)
-    star_ton = stars_data.get('star_ton', 0)
-
-    if star_value == 0:
-        await callback.answer("❌ Сначала введите количество звезд", show_alert=True)
-        await buy_stars(callback, None)
+        await callback.answer("❌ Сначала выберите количество звёзд", show_alert=True)
         return
 
-    username = callback.from_user.username or callback.from_user.first_name
+    star_value = stars_data['star_value']
+    formulastar = stars_data['formulastar']
+
+    # Получаем username
+    username = callback.from_user.username
+    if not username:
+        username = f"id{user_id}"
+    else:
+        username = f"@{username}"
+
+    # ===== ПРОВЕРЯЕМ ТОЛЬКО СУЩЕСТВОВАНИЕ USERNAME =====
+    from username_checker import check_username
+
+    check_msg = await callback.message.answer("🔍 Проверяю пользователя...")
+    result = await check_username(username)
+    await delete_user_message(user_id, check_msg.message_id)
+
+    if not result['exists']:
+        # Username не существует
+        error_text = f"❌Пользователь не найден."
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="Попробовать снова", callback_data="stars")]
+        ])
+        sent_message = await callback.message.answer(error_text, reply_markup=keyboard)
+        await save_and_delete_previous(user_id, sent_message.message_id)
+        await callback.answer()
+        return
 
     text = (
         f"⭐️Telegram Stars\n\n"
         f"❗️Количество: {star_value} звёзд\n"
-        f"💰 Стоимость: {formulastar}₽ или {star_ton} TON\n"
-        f"👤Получатель: @{username}\n\n"
+        f"💰 Стоимость: {formulastar}₽ \n"
+        f"👤 Получатель: {username}\n\n"
         f"Выберите способ оплаты:"
     )
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🏦 СБП", callback_data=f"payment_sbp_stars_{star_value}")],
-        [InlineKeyboardButton(text="🔐 Cryptobot", callback_data=f"payment_crypto_stars_{star_value}")],
-        [InlineKeyboardButton(text="💎 TON", url=f"ton://transfer/{TON_WALLET}?amount={int(star_ton * 1000000000)}")],
-        [InlineKeyboardButton(text="❌ Отмена", callback_data="buy_stars")]
+        [InlineKeyboardButton(text="🏦СБП", callback_data=f"sbp_stars_{formulastar}")],
+        [InlineKeyboardButton(text="💎Cryptobot", callback_data=f"crypto_stars_{round (formulastar /0.97,1)}")],
+        [InlineKeyboardButton(text="❌ Отмена", callback_data="back_to_stars_choice")]
     ])
 
-    await edit_with_deletion(
-        callback=callback,
-        caption=text,
-        reply_markup=keyboard
-    )
+    try:
+        sent_message = await callback.message.answer_photo(caption=text, reply_markup=keyboard)
+    except:
+        sent_message = await callback.message.answer(text, reply_markup=keyboard)
 
+    await save_and_delete_previous(user_id, sent_message.message_id)
+    await callback.answer()
 
+# ===== КНОПКА "ПОДАРИТЬ ДРУГУ" =====
 @router.callback_query(F.data == "gift_stars_friend")
-async def gift_stars_friend(callback: CallbackQuery, state: FSMContext):
+async def gift_stars_friend_callback(callback: CallbackQuery, state: FSMContext):
     user_id = callback.from_user.id
-    
-    # Получаем данные из надежного хранилища
-    stars_data = user_data.get_stars_data(user_id)
-    
-    if not stars_data:
-        await callback.answer("❌ Сначала введите количество звезд", show_alert=True)
-        await buy_stars(callback, None)
-        return
-    
-    star_value = stars_data.get('star_value', 0)
-    formulastar = stars_data.get('formulastar', 0)
-    star_ton = stars_data.get('star_ton', 0)
+    stars_data = get_user_data(user_id, "stars")
 
-    if star_value == 0:
-        await callback.answer("❌ Сначала введите количество звезд", show_alert=True)
+    if not stars_data:
+        await callback.answer("❌ Сначала выберите количество звёзд", show_alert=True)
         return
+
+    star_value = stars_data['star_value']
+    formulastar = stars_data['formulastar']
 
     text = (
         f"⭐️Telegram Stars\n\n"
         f"❗️Количество: {star_value} звёзд\n"
-        f"💰Стоимость: {formulastar}₽ / {star_ton} TON\n\n"
-        "👤Введите @username получателя:"
+        f"💰Стоимость: {formulastar}₽ \n\n"
+        f"👤Введите @username получателя:"
     )
 
-    await edit_with_deletion(
-        callback=callback,
-        caption=text,
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="Назад", callback_data="buy_stars")]
-        ])
-    )
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="Назад", callback_data="back_to_stars_choice")]
+    ])
 
+    try:
+        sent_message = await callback.message.answer_photo(caption=text, reply_markup=keyboard)
+    except:
+        sent_message = await callback.message.answer(text, reply_markup=keyboard)
+
+    await save_and_delete_previous(user_id, sent_message.message_id)
     await state.set_state(Form.waiting_for_friend_username)
+    await callback.answer()
 
 
+# ===== ВОЗВРАТ К ВЫБОРУ ПОЛУЧАТЕЛЯ =====
+@router.callback_query(F.data == "back_to_stars_choice")
+async def back_to_stars_choice_callback(callback: CallbackQuery):
+    user_id = callback.from_user.id
+    stars_data = get_user_data(user_id, "stars")
+
+    if not stars_data:
+        await callback.answer("❌ Данные не найдены", show_alert=True)
+        return
+
+    star_value = stars_data['star_value']
+    formulastar = stars_data['formulastar']
+    star_ton = stars_data['star_ton']
+
+    text = (
+        f"⭐️Telegram Stars\n\n"
+        f"❗️Количество: {star_value} звёзд\n"
+        f"💰 Стоимость: {formulastar}₽ \n\n"
+        f"Для кого вы приобретаете:"
+    )
+
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="💫 Купить себе", callback_data="buy_stars_self")],
+        [InlineKeyboardButton(text="🎁 Подарить другу", callback_data="gift_stars_friend")],
+        [InlineKeyboardButton(text="Назад", callback_data="stars")]
+    ])
+
+    try:
+        photo = FSInputFile("images/stars.jpg")
+        sent_message = await callback.message.answer_photo(photo=photo, caption=text, reply_markup=keyboard)
+    except:
+        sent_message = await callback.message.answer(text, reply_markup=keyboard)
+
+    await save_and_delete_previous(user_id, sent_message.message_id)
+    await callback.answer()
+
+
+# ===== ОБРАБОТКА USERNAME ДЛЯ ЗВЁЗД =====
 @router.message(Form.waiting_for_friend_username)
 async def process_friend_username(message: Message, state: FSMContext):
+    await delete_user_message(message.from_user.id, message.message_id)
+
     username = message.text.strip()
-
-    # Удаляем сообщение пользователя
-    try:
-        await bot.delete_message(chat_id=message.chat.id, message_id=message.message_id)
-    except:
-        pass
-
-    # Очистка юзернейма
-    if username.startswith('@'):
-        username = username[1:]
-
-    if len(username) < 3:
-        await send_with_deletion(
-            user_id=message.from_user.id,
-            text="❌ Username должен содержать минимум 3 символа"
-        )
+    if not username:
+        error_msg = await message.answer("❌ Пожалуйста, введите username")
+        await save_and_delete_previous(message.from_user.id, error_msg.message_id)
+        await asyncio.sleep(2)
+        await delete_user_message(message.from_user.id, error_msg.message_id)
         return
 
-    # Проверка формата юзернейма
-    if not re.match(r'^[a-zA-Z][a-zA-Z0-9_]{2,31}$', username):
-        await send_with_deletion(
-            user_id=message.from_user.id,
-            text="❌ Некорректный формат username.\n\n"
-                 "Правила:\n"
-                 "• От 3 до 32 символов\n"
-                 "• Только буквы (a-z), цифры (0-9) и подчеркивание (_)\n"
-                 "• Не может начинаться с цифры\n\n"
-                 "Пример: @username, @user_name, @User123"
-        )
+    # ===== ПРОВЕРКА ЧЕРЕЗ username_checker.py =====
+    from username_checker import check_username
+
+    # Проверяем существует ли такой username
+    check_msg = await message.answer("🔍 Проверяю существование пользователя...")
+    result = await check_username(username)
+    await delete_user_message(message.from_user.id, check_msg.message_id)
+
+    if not result['exists']:
+        # Юзернейм не существует
+        error_text = f"❌Указанный пользователь не найден\n\n📥Пользователь: {username}"
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="Попробовать снова", callback_data="gift_stars_friend")]
+        ])
+        sent_message = await message.answer(error_text, reply_markup=keyboard)
+        await save_and_delete_previous(message.from_user.id, sent_message.message_id)
+        await state.clear()
         return
 
-    # Показываем сообщение о проверке
-    checking_msg = await send_with_deletion(
-        user_id=message.from_user.id,
-        text=f"🔍 Проверяю @{username}..."
-    )
-
-    # Проверяем существование юзернейма
-    check_result = await check_username_exists(username)
-
-    if not check_result['exists']:
-        await send_with_deletion(
-            user_id=message.from_user.id,
-            text=f"❌ Пользователь @{username} не найден!\n\n"
-                 f"Причина: {check_result['reason']}\n\n"
-                 f"Возможные проблемы:\n"
-                 f"• Юзернейм указан с ошибкой\n"
-                 f"• Пользователь изменил юзернейм\n"
-                 f"• Аккаунт удален или заблокирован\n\n"
-                 f"Пожалуйста, проверьте правильность юзернейма и попробуйте снова.\n\n"
-                 f"<i>Для повторного ввода нажмите:</i>",
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="🔄 Ввести другой юзернейм", callback_data="gift_stars_friend")],
-                [InlineKeyboardButton(text="❌ Отмена", callback_data="buy_stars")]
-            ])
-        )
-        return
+    # Юзернейм существует - продолжаем
+    if not username.startswith('@'):
+        username = f"@{username}"
 
     user_id = message.from_user.id
-    stars_data = user_data.get_stars_data(user_id)
-    
+    stars_data = get_user_data(user_id, "stars")
+
     if not stars_data:
-        await send_with_deletion(
-            user_id=user_id,
-            text="❌ Данные не найдены. Начните сначала."
-        )
-        await buy_stars(callback=message, state=None)
-        return
-    
-    star_value = stars_data.get('star_value', 0)
-    formulastar = stars_data.get('formulastar', 0)
-    star_ton = stars_data.get('star_ton', 0)
-
-    if star_value == 0:
-        await send_with_deletion(
-            user_id=user_id,
-            text="❌ Данные не найдены"
-        )
+        await message.answer("❌ Ошибка данных")
+        await state.clear()
         return
 
-    # Пользователь найден, продолжаем
+    star_value = stars_data['star_value']
+    formulastar = stars_data['formulastar']
+    star_ton = stars_data['star_ton']
+
     text = (
-        f"⭐️ Telegram Stars\n\n"
+        f"⭐️Telegram Stars\n\n"
         f"❗️Количество: {star_value} звёзд\n"
-        f"💰Стоимость: {formulastar}₽ / {star_ton} TON\n"
-        f"👤Получатель: @{username}\n\n"
+        f"💰 Стоимость: {formulastar}₽\n"
+        f"👤 Получатель: {username}\n\n"
         f"Выберите способ оплаты:"
     )
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🏦 СБП",
-                              callback_data=f"payment_sbp_stars_friend_{star_value}_{username}")],
-        [InlineKeyboardButton(text="🔐 Cryptobot",
-                              callback_data=f"payment_crypto_stars_friend_{star_value}_{username}")],
-        [InlineKeyboardButton(text="💎 TON",
-                              url=f"ton://transfer/{TON_WALLET}?amount={int(star_ton * 1000000000)}")],
-        [InlineKeyboardButton(text="🔄 Изменить получателя", callback_data="gift_stars_friend")],
-        [InlineKeyboardButton(text="❌ Отмена", callback_data="buy_stars")]
+        [InlineKeyboardButton(text="🏦СБП", callback_data=f"sbp_stars_friend_{formulastar}")],
+        [InlineKeyboardButton(text="💎Cryptobot", callback_data=f"crypto_stars_friend_{round (formulastar /0.97,1)}")],
+        [InlineKeyboardButton(text="❌Отмена", callback_data="back_to_stars_choice")]
     ])
 
-    photo = get_photo("stars.jpg")
+    try:
+        sent_message = await message.answer_photo(caption=text, reply_markup=keyboard)
+    except:
+        sent_message = await message.answer(text, reply_markup=keyboard)
 
-    await send_with_deletion(
-        user_id=user_id,
-        photo=photo,
-        caption=text,
-        reply_markup=keyboard
-    )
-
+    await save_and_delete_previous(message.from_user.id, sent_message.message_id)
     await state.clear()
 
 
-# ===== ПОКУПКА TON =====
-@router.callback_query(F.data == "buy_ton")
-async def buy_ton(callback: CallbackQuery, state: FSMContext):
+# ===== КОМАНДА /TON =====
+@router.message(Command("ton"))
+async def ton_cmd(message: Message, state: FSMContext):
+    await state.clear()
+    global TON_RUB
+    TON_RUB = await get_ton_price()
+
     text = (
-        "💎 TON\n\n"
-        "💰Курс к рублю: 200₽\n"
-        "Минимальное количество: 1 TON\n\n"
-        "✏️Введите адрес кошелька для получения TON:"
+        f"💎 TON\n\n"
+        f"💰Курс к рублю: {TON_RUB + 11}₽\n"
+        f"Минимальное количество: 1 TON\n\n"
+        f"✏️Введите адрес кошелька для получения TON:"
     )
 
-    await edit_with_deletion(
-        callback=callback,
-        photo=get_photo("ton.jpg"),
-        caption=text,
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="Назад", callback_data="menu")]
-        ])
-    )
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="Назад", callback_data="menu")]
+    ])
 
+    try:
+        photo = FSInputFile("images/ton.jpg")
+        sent_message = await message.answer_photo(photo=photo, caption=text, reply_markup=keyboard)
+    except:
+        sent_message = await message.answer(text, reply_markup=keyboard)
+
+    await save_and_delete_previous(message.from_user.id, sent_message.message_id)
     await state.set_state(Form.waiting_for_ton_address)
 
 
+# ===== ОБРАБОТКА АДРЕСА TON (с API проверкой) =====
 @router.message(Form.waiting_for_ton_address)
 async def process_ton_address(message: Message, state: FSMContext):
+    await delete_user_message(message.from_user.id, message.message_id)
+
     address = message.text.strip()
 
-    # Удаляем сообщение пользователя
-    try:
-        await bot.delete_message(chat_id=message.chat.id, message_id=message.message_id)
-    except:
-        pass
-
-    # Показываем сообщение о проверке
-    checking_msg = await send_with_deletion(
-        user_id=message.from_user.id,
-        text=f"🔍 Проверяю адрес кошелька..."
-    )
-
-    # Проверяем адрес TON
-    check_result = await check_ton_address(address)
-
-    if not check_result['valid']:
-        await send_with_deletion(
-            user_id=message.from_user.id,
-            text=f"❌ Некорректный адрес TON кошелька!\n\n"
-                 f"Причина: {check_result['reason']}\n\n"
-                 f"📌 Примеры правильных адресов:\n"
-                 f"• UQAL5Y75ykdUsMmW5FgnxKJyz1-njyS_oNuN1Lp2_hgNundO\n"
-                 f"• EQD__________________________________________voXL\n\n"
-                 f"Убедитесь, что:\n"
-                 f"• Адрес начинается с UQ, EQ или 0:\n"
-                 f"• Содержит только буквы, цифры и символы -_ (дефис и подчеркивание)\n"
-                 f"• Длина обычно 48 символов и более\n\n"
-                 f"<i>Попробуйте ввести адрес снова:</i>",
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="🔄 Ввести другой адрес", callback_data="buy_ton")],
-                [InlineKeyboardButton(text="❌ Отмена", callback_data="menu")]
-            ])
+    # Проверка формата
+    if not is_valid_ton_format(address):
+        text = (
+            f"❌Указанный вами адрес не корректен\n\n"
+            f"📥Адрес: {address}"
         )
-        return
 
-    # Если адрес валидный, но мы не уверены в его существовании
-    if not check_result['exists']:
-        # Предупреждаем пользователя, но позволяем продолжить
-        warning_text = (
-            f"⚠️ Внимание!\n\n"
-            f"Адрес: {address[:10]}...{address[-10:]}\n\n"
-            f"Не удалось подтвердить активность этого адреса в сети TON.\n"
-            f"Убедитесь, что адрес верный, иначе TON будут отправлены "
-            f"на несуществующий кошелек и потеряны навсегда!\n\n"
-            f"Хотите продолжить с этим адресом?"
-        )
-        
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="✅ Да, продолжить", callback_data=f"confirm_address_{address}")],
-            [InlineKeyboardButton(text="🔄 Ввести другой адрес", callback_data="buy_ton")]
+            [InlineKeyboardButton(text="Попробовать снова", callback_data="ton")]
         ])
-        
-        await send_with_deletion(
-            user_id=message.from_user.id,
-            text=warning_text,
-            reply_markup=keyboard
-        )
+
+        sent_message = await message.answer(text, reply_markup=keyboard)
+        await save_and_delete_previous(message.from_user.id, sent_message.message_id)
+        await state.clear()
         return
 
-    # Адрес валидный и существует, сохраняем и запрашиваем сумму
-    user_data.set_ton_data(message.from_user.id, address)
-    
-    balance_info = ""
-    if check_result['balance'] is not None:
-        balance_info = f"💰 Баланс кошелька: {check_result['balance']:.2f} TON\n\n"
-    
-    text = (
-        f"✅ Адрес кошелька проверен!\n\n"
-        f"{balance_info}"
-        f"📥 Адрес: {address[:15]}...{address[-10:]}\n\n"
-        f"✏️ Введите сумму в TON для получения:"
-    )
+    # Проверка существования через API
+    checking_msg = await message.answer("⏳ Проверяю адрес через сеть TON...")
 
-    await send_with_deletion(
-        user_id=message.from_user.id,
-        photo=get_photo("ton.jpg"),
-        caption=text,
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="🔄 Изменить адрес", callback_data="buy_ton")]
+    exists, feedback = await check_ton_address_exists(address)
+
+    await delete_user_message(message.from_user.id, checking_msg.message_id)
+
+    if not exists:
+        text = f"{feedback}\n\n📥Адрес:{address}"
+
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text=" Попробовать снова", callback_data="ton")]
         ])
+
+        sent_message = await message.answer(text, reply_markup=keyboard)
+        await save_and_delete_previous(message.from_user.id, sent_message.message_id)
+        await state.clear()
+        return
+
+    # Адрес валиден и существует
+    save_user_data(message.from_user.id, "ton_address", address)
+
+    text = (
+        f"💎 TON\n\n"
+        f"📥 Адрес: {address}\n\n"
+        f"✏️ Теперь введите сумму в TON для покупки:"
     )
 
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="Назад", callback_data="ton")]
+    ])
+
+    sent_message = await message.answer(text, reply_markup=keyboard)
+    await save_and_delete_previous(message.from_user.id, sent_message.message_id)
     await state.set_state(Form.waiting_for_ton_amount)
 
 
-@router.callback_query(F.data.startswith("confirm_address_"))
-async def confirm_address_callback(callback: CallbackQuery, state: FSMContext):
-    """Обработка подтверждения адреса"""
-    address = callback.data.replace("confirm_address_", "")
-    user_id = callback.from_user.id
-    
-    # Сохраняем адрес
-    user_data.set_ton_data(user_id, address)
-    
-    text = (
-        f"✅ Адрес кошелька принят!\n\n"
-        f"⚠️ Предупреждение: Адрес не был полностью проверен.\n"
-        f"📥 Адрес: {address[:15]}...{address[-10:]}\n\n"
-        f"✏️ Введите сумму в TON для получения:"
-    )
-
-    await edit_with_deletion(
-        callback=callback,
-        photo=get_photo("ton.jpg"),
-        caption=text,
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="🔄 Изменить адрес", callback_data="buy_ton")]
-        ])
-    )
-
-    await state.set_state(Form.waiting_for_ton_amount)
-
-
+# ===== ОБРАБОТКА СУММЫ TON =====
 @router.message(Form.waiting_for_ton_amount)
 async def process_ton_amount(message: Message, state: FSMContext):
-    try:
-        ton_value = float(message.text)
+    await delete_user_message(message.from_user.id, message.message_id)
 
-        # Удаляем сообщение пользователя
-        try:
-            await bot.delete_message(chat_id=message.chat.id, message_id=message.message_id)
-        except:
-            pass
+    try:
+        ton_value = float(message.text.strip().replace(',', '.'))
 
         if ton_value < 1:
-            await send_with_deletion(
-                user_id=message.from_user.id,
-                text="❌ Минимальное количество: 1 TON"
-            )
+            error_msg = await message.answer("❌ Минимальное количество: 1 TON")
+            await save_and_delete_previous(message.from_user.id, error_msg.message_id)
+            await asyncio.sleep(2)
+            await delete_user_message(message.from_user.id, error_msg.message_id)
             return
 
+        # Расчет стоимости
+        formulaTON = round(ton_value * (TON_RUB + 11), 1)
+
+        # Получаем адрес
         user_id = message.from_user.id
-        ton_data = user_data.get_ton_data(user_id)
-        
-        if not ton_data:
-            await send_with_deletion(
-                user_id=user_id,
-                text="❌ Адрес кошелька не найден. Начните сначала."
-            )
-            await buy_ton(callback=message, state=None)
-            return
-        
-        address = ton_data.get('address', 'Не указан')
+        address = get_user_data(user_id, "ton_address")
 
-        formulaTON = round(ton_value * 200, 1)
+        if not address:
+            await message.answer("❌ Ошибка: адрес не найден. Начните заново.")
+            await state.clear()
+            return
+
+        # Сохраняем данные
+        save_user_data(user_id, "ton_purchase", {
+            'ton_value': ton_value,
+            'formulaTON': formulaTON,
+            'address': address
+        })
 
         text = (
-            f"💎 TON\n\n"
-            f"🩵Количество: {ton_value} TON\n"
-            f"💰Стоимость: {formulaTON}₽\n"
-            f"📥Адрес кошелька: {address[:15]}...{address[-10:]}\n\n"
+            f"💎TON\n\n"
+            f"❗Количество: {ton_value} TON\n"
+            f"💰Стоимость: {formulaTON} ₽\n"
+            f"📥Адрес получения: {address}\n\n"
             f"Выберите способ оплаты:"
         )
 
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="🏦 СБП", callback_data=f"payment_sbp_ton_{ton_value}")],
-            [InlineKeyboardButton(text="🔐 Cryptobot", callback_data=f"payment_crypto_ton_{ton_value}")],
-            [InlineKeyboardButton(text="❌ Отмена", callback_data="buy_ton")]
+            [InlineKeyboardButton(text="🏦 СБП", callback_data=f"sbp_ton_{formulaTON}")],
+            [InlineKeyboardButton(text="💎Cryptobot", callback_data=f"crypto_ton_{round(formulaTON/0.97,1)}")],
+            [InlineKeyboardButton(text="❌ Отмена", callback_data="ton")]
         ])
 
-        await send_with_deletion(
-            user_id=user_id,
-            photo=get_photo("ton.jpg"),
-            caption=text,
-            reply_markup=keyboard
-        )
+        try:
+            sent_message = await message.answer_photo(caption=text, reply_markup=keyboard)
+        except:
+            sent_message = await message.answer(text, reply_markup=keyboard)
 
+        await save_and_delete_previous(message.from_user.id, sent_message.message_id)
         await state.clear()
 
     except ValueError:
-        # Удаляем сообщение пользователя
-        try:
-            await bot.delete_message(chat_id=message.chat.id, message_id=message.message_id)
-        except:
-            pass
-
-        await send_with_deletion(
-            user_id=message.from_user.id,
-            text="❌ Введите число (например: 10)"
-        )
+        error_msg = await message.answer("❌ Пожалуйста, введите корректное число (например: 1.5 или 2)")
+        await save_and_delete_previous(message.from_user.id, error_msg.message_id)
+        await asyncio.sleep(2)
+        await delete_user_message(message.from_user.id, error_msg.message_id)
 
 
-# ===== ПОКУПКА PREMIUM =====
-@router.callback_query(F.data == "buy_premium")
-async def buy_premium(callback: CallbackQuery):
+# ===== КОМАНДА /PREMIUM =====
+@router.message(Command("premium"))
+async def premium_cmd(message: Message):
     text = "👑Telegram Premium\n\n🗓Выберите период подписки:"
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
@@ -1078,427 +644,432 @@ async def buy_premium(callback: CallbackQuery):
         [InlineKeyboardButton(text="Назад", callback_data="menu")]
     ])
 
-    await edit_with_deletion(
-        callback=callback,
-        photo=get_photo("premium.jpg"),
-        caption=text,
-        reply_markup=keyboard
-    )
+    try:
+        photo = FSInputFile("images/premium.jpg")
+        sent_message = await message.answer_photo(photo=photo, caption=text, reply_markup=keyboard)
+    except:
+        sent_message = await message.answer(text, reply_markup=keyboard)
+
+    await save_and_delete_previous(message.from_user.id, sent_message.message_id)
 
 
+# ===== КНОПКИ PREMIUM =====
 @router.callback_query(F.data.startswith("premium_"))
-async def process_premium_period(callback: CallbackQuery):
-    user_id = callback.from_user.id
-    
-    # Определяем период и цену
-    if callback.data == "premium_12":
-        period = "Premium - 12 месяцев"
-        price = 2800
-    elif callback.data == "premium_6":
-        period = "Premium - 6 месяцев"
-        price = 1600
-    elif callback.data == "premium_3":
-        period = "Premium - 3 месяца"
-        price = 1200
-    else:
-        period = "Premium"
-        price = 0
-    
-    prem_ton = round(price / 200, 2)
-    
-    # Сохраняем данные в надежное хранилище
-    user_data.set_premium_data(user_id, period, price, prem_ton)
+async def premium_period_callback(callback: CallbackQuery, state: FSMContext):
+    periods = {
+        "premium_12": "12 месяцев",
+        "premium_6": "6 месяцев",
+        "premium_3": "3 месяца"
+    }
+
+    prices = {
+        "premium_12": 3000,
+        "premium_6": 1700,
+        "premium_3": 1300
+    }
+
+    period = periods.get(callback.data, "3 месяца")
+    priceprem = prices.get(callback.data, 1300)
+
+    save_user_data(callback.from_user.id, "premium", {
+        'period': period,
+        'priceprem': priceprem
+    })
 
     text = (
-        f"👑 Telegram {period}\n\n"
-        f"💰Стоимость: {price}₽ / {prem_ton} TON\n\n"
+        f"👑 Telegram Premium\n\n"
+        f"📅Срок: {period}\n"
+        f"💰Стоимость: {priceprem}₽\n\n"
         f"Для кого вы приобретаете:"
     )
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="💫 Купить себе", callback_data="buy_premium_self")],
         [InlineKeyboardButton(text="🎁 Подарить другу", callback_data="gift_premium_friend")],
-        [InlineKeyboardButton(text="Назад", callback_data="buy_premium")]
+        [InlineKeyboardButton(text="Назад", callback_data="menu")]
     ])
 
-    await edit_with_deletion(
-        callback=callback,
-        photo=get_photo("premium.jpg"),
-        caption=text,
-        reply_markup=keyboard
-    )
+    try:
+        sent_message = await callback.message.answer_photo(caption=text, reply_markup=keyboard)
+    except:
+        sent_message = await callback.message.answer(text, reply_markup=keyboard)
 
+    await save_and_delete_previous(callback.from_user.id, sent_message.message_id)
+    await callback.answer()
 
+# ===== КНОПКА "КУПИТЬ PREMIUM СЕБЕ" =====
 @router.callback_query(F.data == "buy_premium_self")
-async def buy_premium_self(callback: CallbackQuery):
+async def buy_premium_self_callback(callback: CallbackQuery):
     user_id = callback.from_user.id
-    
-    # Получаем данные из надежного хранилища
-    premium_data = user_data.get_premium_data(user_id)
-    
+    premium_data = get_user_data(user_id, "premium")
+
     if not premium_data:
-        await callback.answer("❌ Сначала выберите период подписки", show_alert=True)
-        await buy_premium(callback)
-        return
-    
-    period = premium_data.get('period', 'Premium')
-    price = premium_data.get('price', 0)
-    prem_ton = premium_data.get('prem_ton', 0)
-    
-    if price == 0:
-        await callback.answer("❌ Сначала выберите период подписки", show_alert=True)
-        await buy_premium(callback)
+        await callback.answer("❌Сначала выберите период", show_alert=True)
         return
 
-    username = callback.from_user.username or callback.from_user.first_name
+    period = premium_data['period']
+    priceprem = premium_data['priceprem']
 
-    text = (
-        f"👑 Telegram {period}\n\n"
-        f"💰 Стоимость: {price}₽ / {prem_ton} TON\n"
-        f"👤 Получатель: @{username}\n\n"
-        f"Выберите способ оплаты:"
-    )
+    # Получаем username
+    username = callback.from_user.username
+    if not username:
+        username = f"id{user_id}"
+    else:
+        username = f"@{username}"
 
-    # Создаем безопасный идентификатор периода
-    period_safe = period.replace(' ', '_').replace('-', '_')
+    # ===== ПРОВЕРЯЕМ PREMIUM СТАТУС ПОЛЬЗОВАТЕЛЯ =====
+    from username_checker import check_username
 
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🏦 СБП", 
-                              callback_data=f"payment_sbp_premium_{price}_{period_safe}")],
-        [InlineKeyboardButton(text="🔐 Cryptobot", 
-                              callback_data=f"payment_crypto_premium_{price}_{period_safe}")],
-        [InlineKeyboardButton(text="💎 TON", 
-                              url=f"ton://transfer/{TON_WALLET}?amount={int(prem_ton * 1000000000)}")],
-        [InlineKeyboardButton(text="❌ Отмена", callback_data="buy_premium")]
-    ])
+    check_msg = await callback.message.answer("🔍 Проверяю статус Premium...")
+    result = await check_username(username)
+    await delete_user_message(user_id, check_msg.message_id)
 
-    await edit_with_deletion(
-        callback=callback,
-        photo=get_photo("premium.jpg"),
-        caption=text,
-        reply_markup=keyboard
-    )
-
-
-@router.callback_query(F.data == "gift_premium_friend")
-async def gift_premium_friend(callback: CallbackQuery, state: FSMContext):
-    user_id = callback.from_user.id
-    
-    # Получаем данные из надежного хранилища
-    premium_data = user_data.get_premium_data(user_id)
-    
-    if not premium_data:
-        await callback.answer("❌ Сначала выберите период подписки", show_alert=True)
-        await buy_premium(callback)
-        return
-    
-    period = premium_data.get('period', 'Premium')
-    price = premium_data.get('price', 0)
-    prem_ton = premium_data.get('prem_ton', 0)
-    
-    if price == 0:
-        await callback.answer("❌ Сначала выберите период подписки", show_alert=True)
-        await buy_premium(callback)
-        return
-
-    text = (
-        f"👑 Telegram {period}\n\n"
-        f"💰 Стоимость: {price}₽ / {prem_ton} TON\n\n"
-        "👤 Введите @username получателя:"
-    )
-
-    await edit_with_deletion(
-        callback=callback,
-        photo=get_photo("premium.jpg"),
-        caption=text,
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="Назад", callback_data=f"premium_back")]
-        ])
-    )
-
-    await state.set_state(Form.waiting_for_premium_friend)
-
-
-# Обработчик для кнопки "Назад" из gift_premium_friend
-@router.callback_query(F.data == "premium_back")
-async def premium_back_handler(callback: CallbackQuery):
-    """Обработчик кнопки Назад из gift_premium_friend"""
-    user_id = callback.from_user.id
-    premium_data = user_data.get_premium_data(user_id)
-    
-    if premium_data:
-        period = premium_data.get('period', 'Premium')
-        price = premium_data.get('price', 0)
-        prem_ton = premium_data.get('prem_ton', 0)
-        
+    if result.get('exists') and result.get('premium'):
+        # У пользователя уже есть Premium
         text = (
-            f"👑 Telegram {period}\n\n"
-            f"💰Стоимость: {price}₽ / {prem_ton} TON\n\n"
-            f"Для кого вы приобретаете:"
+            f"❌У вас уже активирован Telegram Premium\n\n"
+            f"Пользователь: {username}\n\n"
+            f"Premium оформить нельзя, так как у вас уже есть активированная подписка."
         )
 
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="💫 Купить себе", callback_data="buy_premium_self")],
             [InlineKeyboardButton(text="🎁 Подарить другу", callback_data="gift_premium_friend")],
-            [InlineKeyboardButton(text="Назад", callback_data="buy_premium")]
+            [InlineKeyboardButton(text="Назад", callback_data="premium")]
         ])
 
-        await edit_with_deletion(
-            callback=callback,
-            photo=get_photo("premium.jpg"),
-            caption=text,
-            reply_markup=keyboard
-        )
+        try:
+            sent_message = await callback.message.answer_photo(caption=text, reply_markup=keyboard)
+        except:
+            sent_message = await callback.message.answer(text, reply_markup=keyboard)
+
     else:
-        await buy_premium(callback)
-
-
-@router.message(Form.waiting_for_premium_friend)
-async def process_premium_friend_username(message: Message, state: FSMContext):
-    username = message.text.strip()
-
-    # Удаляем сообщение пользователя
-    try:
-        await bot.delete_message(chat_id=message.chat.id, message_id=message.message_id)
-    except:
-        pass
-
-    # Очистка юзернейма
-    if username.startswith('@'):
-        username = username[1:]
-
-    if len(username) < 3:
-        await send_with_deletion(
-            user_id=message.from_user.id,
-            text="❌ Username должен содержать минимум 3 символа"
+        # У пользователя НЕТ Premium - можно оформлять
+        text = (
+            f"👑Telegram Premium\n\n"
+            f"📅Срок: {period}\n"
+            f"💰Стоимость: {priceprem}₽\n"
+            f"👤Получатель: {username}\n\n"
+            f"Выберите способ оплаты:"
         )
-        return
 
-    # Проверка формата юзернейма
-    if not re.match(r'^[a-zA-Z][a-zA-Z0-9_]{2,31}$', username):
-        await send_with_deletion(
-            user_id=message.from_user.id,
-            text="❌ Некорректный формат username.\n\n"
-                 "Правила:\n"
-                 "• От 3 до 32 символов\n"
-                 "• Только буквы (a-z), цифры (0-9) и подчеркивание (_)\n"
-                 "• Не может начинаться с цифры\n\n"
-                 "Пример: @username, @user_name, @User123"
-        )
-        return
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🏦СБП", callback_data=f"sbp_premium_{priceprem}")],
+            [InlineKeyboardButton(text="💎Cryptobot", callback_data=f"crypto_premium_{round(priceprem /0.97,1)}")],
+            [InlineKeyboardButton(text="❌Отмена", callback_data="premium")]
+        ])
 
-    # Проверяем существование юзернейма
-    checking_msg = await send_with_deletion(
-        user_id=message.from_user.id,
-        text=f"🔍 Проверяю @{username}..."
-    )
+        try:
+            sent_message = await callback.message.answer_photo(caption=text, reply_markup=keyboard)
+        except:
+            sent_message = await callback.message.answer(text, reply_markup=keyboard)
 
-    check_result = await check_username_exists(username)
+    await save_and_delete_previous(user_id, sent_message.message_id)
+    await callback.answer()
 
-    if not check_result['exists']:
-        await send_with_deletion(
-            user_id=message.from_user.id,
-            text=f"❌ Пользователь @{username} не найден!\n\n"
-                 f"Причина: {check_result['reason']}\n\n"
-                 f"Возможные проблемы:\n"
-                 f"• Юзернейм указан с ошибкой\n"
-                 f"• Пользователь изменил юзернейм\n"
-                 f"• Аккаунт удален или заблокирован\n\n"
-                 f"Пожалуйста, проверьте правильность юзернейма и попробуйте снова.",
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="🔄 Ввести другой юзернейм", callback_data="gift_premium_friend")],
-                [InlineKeyboardButton(text="❌ Отмена", callback_data="buy_premium")]
-            ])
-        )
-        return
+# ===== КНОПКА "ПОДАРИТЬ PREMIUM ДРУГУ" =====
+@router.callback_query(F.data == "gift_premium_friend")
+async def gift_premium_friend_callback(callback: CallbackQuery, state: FSMContext):
+    user_id = callback.from_user.id
+    premium_data = get_user_data(user_id, "premium")
 
-    # Получаем данные о Premium
-    user_id = message.from_user.id
-    premium_data = user_data.get_premium_data(user_id)
-    
     if not premium_data:
-        await send_with_deletion(
-            user_id=user_id,
-            text="❌ Данные о подписке не найдены. Начните сначала."
-        )
-        await buy_premium(callback=message)
+        await callback.answer("❌ Сначала выберите период", show_alert=True)
         return
-    
-    period = premium_data.get('period', 'Premium')
-    price = premium_data.get('price', 0)
-    prem_ton = premium_data.get('prem_ton', 0)
 
-    if price == 0:
-        await send_with_deletion(
-            user_id=user_id,
-            text="❌ Данные о подписке не найдены. Начните сначала."
-        )
-        await buy_premium(callback=message)
-        return
+    period = premium_data['period']
+    priceprem = premium_data['priceprem']
 
     text = (
-        f"👑 Telegram {period}\n\n"
-        f"💰 Стоимость: {price}₽ / {prem_ton} TON\n"
-        f"👤 Получатель: @{username}\n\n"
-        f"Выберите способ оплаты:"
+        f"👑Telegram Premium\n\n"
+        f"📆Срок: {period}\n"
+        f"💰Стоимость: {priceprem}₽\n\n"
+        f"👤Введите @username получателя:"
     )
-
-    # Создаем безопасный идентификатор периода
-    period_safe = period.replace(' ', '_').replace('-', '_')
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🏦 СБП", 
-                              callback_data=f"payment_sbp_premium_friend_{price}_{period_safe}_{username}")],
-        [InlineKeyboardButton(text="🔐 Cryptobot", 
-                              callback_data=f"payment_crypto_premium_friend_{price}_{period_safe}_{username}")],
-        [InlineKeyboardButton(text="💎 TON", 
-                              url=f"ton://transfer/{TON_WALLET}?amount={int(prem_ton * 1000000000)}")],
-        [InlineKeyboardButton(text="🔄 Изменить получателя", callback_data="gift_premium_friend")],
-        [InlineKeyboardButton(text="❌ Отмена", callback_data="buy_premium")]
+        [InlineKeyboardButton(text="Назад", callback_data="premium")]
     ])
 
-    await send_with_deletion(
-        user_id=user_id,
-        photo=get_photo("premium.jpg"),
-        caption=text,
-        reply_markup=keyboard
-    )
+    try:
+        sent_message = await callback.message.answer_photo (caption=text, reply_markup=keyboard)
+    except:
+        sent_message = await callback.message.answer(text, reply_markup=keyboard)
 
-    await state.clear()
+    await save_and_delete_previous(user_id, sent_message.message_id)
+    await state.set_state(Form.waiting_for_premium_friend)
+    await callback.answer()
 
 
-# ===== ОБРАБОТКА ОПЛАТЫ =====
-@router.callback_query(F.data.startswith("payment_"))
-async def process_payment(callback: CallbackQuery):
-    data_parts = callback.data.split("_")
-    if len(data_parts) < 4:
-        await callback.answer("❌ Ошибка обработки платежа", show_alert=True)
+# ===== ОБРАБОТКА USERNAME ДЛЯ PREMIUM =====
+@router.message(Form.waiting_for_premium_friend)
+async def process_premium_friend(message: Message, state: FSMContext):
+    await delete_user_message(message.from_user.id, message.message_id)
+
+    username = message.text.strip()
+    if not username:
+        error_msg = await message.answer("❌Пожалуйста, введите username")
+        await save_and_delete_previous(message.from_user.id, error_msg.message_id)
+        await asyncio.sleep(2)
+        await delete_user_message(message.from_user.id, error_msg.message_id)
         return
 
-    payment_type = data_parts[1]
-    product = data_parts[2]
-    
-    # Инициализация переменных
-    friend_username = None
-    period = None
-    
-    # Обработка разных типов продуктов
-    if product == "stars":
-        amount = data_parts[3]
-        cost = round(float(amount) * 1.7, 1)
-        product_name = "Telegram Stars"
-        
-        # Проверяем, есть ли юзернейм друга
-        if len(data_parts) > 4:
-            friend_username = data_parts[4]
-    
-    elif product == "ton":
-        amount = data_parts[3]
-        cost = round(float(amount) * 200, 1)
-        product_name = "TON"
-    
-    elif product == "premium":
-        amount = data_parts[3]
-        cost = float(amount)
-        
-        # Проверяем, есть ли период и юзернейм
-        if len(data_parts) > 4:
-            period = data_parts[4].replace('_', ' ')
-            product_name = f"Telegram {period}"
-        else:
-            product_name = "Telegram Premium"
-        
-        # Проверяем, есть ли юзернейм друга
-        if len(data_parts) > 5:
-            friend_username = data_parts[5]
-    
-    else:
-        amount = data_parts[3]
-        cost = float(amount)
-        product_name = "товар"
+    # ===== ПРОВЕРКА ЧЕРЕЗ username_checker.py =====
+    from username_checker import check_username
 
-    # Формируем текст в зависимости от наличия друга
-    if friend_username:
+    # Проверяем существует ли такой username
+    check_msg = await message.answer("🔍 Проверяю пользователя...")
+    result = await check_username(username)
+    await delete_user_message(message.from_user.id, check_msg.message_id)
+
+    if not result['exists']:
+        # Юзернейм не существует
+        error_text = f"❌Пользователь не найден.\n\nПользователь: {username}"
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="Попробовать снова", callback_data="gift_premium_friend")]
+        ])
+        sent_message = await message.answer(error_text, reply_markup=keyboard)
+        await save_and_delete_previous(message.from_user.id, sent_message.message_id)
+        await state.clear()
+        return
+
+    # Юзернейм существует
+    if not username.startswith('@'):
+        username = f"@{username}"
+
+    user_id = message.from_user.id
+    premium_data = get_user_data(user_id, "premium")
+
+    if not premium_data:
+        await message.answer("❌Ошибка данных")
+        await state.clear()
+        return
+
+    period = premium_data['period']
+    priceprem = premium_data['priceprem']
+
+    # ===== ПРОВЕРЯЕМ PREMIUM СТАТУС =====
+    if result.get('premium'):
+        # У пользователя уже есть Premium
         text = (
-            f"✅ Заказ оформлен!\n\n"
-            f"📦 Товар: {product_name}\n"
-            f"💰 Сумма: {cost}₽\n"
-            f"👤 Получатель: @{friend_username}\n"
-            f"💳 Способ: {payment_type}\n\n"
-            f"<i>Демо-режим: оплата не проводилась</i>"
-        )
-    else:
-        text = (
-            f"✅ Заказ оформлен!\n\n"
-            f"📦 Товар: {product_name}\n"
-            f"💰 Сумма: {cost}₽\n"
-            f"💳 Способ: {payment_type}\n\n"
-            f"<i>Демо-режим: оплата не проводилась</i>"
+            f"❌У пользователя уже активирован Telegram Premium\n\n"
+            f"Пользователь: {username}\n\n"
+            f"Premium оформить нельзя, так как есть активированная подписка."
         )
 
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🏠 В меню", callback_data="menu")]
-    ])
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="Попробовать снова", callback_data="premium")]
+        ])
 
-    await edit_with_deletion(
-        callback=callback,
-        caption=text,
-        reply_markup=keyboard
-    )
+        try:
+
+            sent_message = await message.answer_photo( caption=text, reply_markup=keyboard)
+        except:
+            sent_message = await message.answer(text, reply_markup=keyboard)
+
+    else:
+        # У пользователя НЕТ Premium - можно оформлять
+        text = (
+            f"👑Telegram Premium\n\n"
+            f"📆Срок: {period}\n"
+            f"💰Стоимость: {priceprem}₽\n"
+            f"👤Пользователь: {username}\n\n"
+            f"Выберите способ оплаты:"
+        )
+
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🏦СБП", callback_data=f"sbp_premium_{priceprem}")],
+            [InlineKeyboardButton(text="💎Cryptobot", callback_data=f"crypto_premium_{round(priceprem /0.97,1)}")],
+            [InlineKeyboardButton(text="❌ Отмена", callback_data="premium")]
+        ])
+
+        try:
+            sent_message = await message.answer_photo(caption=text, reply_markup=keyboard)
+        except:
+            sent_message = await message.answer(text, reply_markup=keyboard)
+
+    await save_and_delete_previous(message.from_user.id, sent_message.message_id)
+    await state.clear()
+
+# ===== ОБРАБОТКА КНОПОК МЕНЮ =====
+@router.callback_query(F.data == "menu")
+async def menu_btn(callback: CallbackQuery):
+    await menu_cmd(callback.message)
+    await callback.answer()
 
 
-# ===== ОБРАБОТКА НЕИЗВЕСТНЫХ КОМАНД =====
-@router.message()
-async def unknown_message(message: Message):
-    # Удаляем сообщение пользователя
-    try:
-        await bot.delete_message(chat_id=message.chat.id, message_id=message.message_id)
-    except:
-        pass
+@router.callback_query(F.data == "stars")
+async def stars_btn(callback: CallbackQuery, state: FSMContext):
+    await stars_cmd(callback.message, state)
+    await callback.answer()
 
-    # Показываем меню
-    await show_menu(message=message)
 
+@router.callback_query(F.data == "ton")
+async def ton_btn(callback: CallbackQuery, state: FSMContext):
+    await ton_cmd(callback.message, state)
+    await callback.answer()
+
+
+@router.callback_query(F.data == "premium")
+async def premium_btn(callback: CallbackQuery):
+    await premium_cmd(callback.message)
+    await callback.answer()
+
+
+# ===== ОПЛАТА =====
+@router.callback_query(F.data.startswith("crypto_"))
+async def crypto_payment(callback: CallbackQuery):
+    user_id = callback.from_user.id
+    data_parts = callback.data.split("_")
+
+    if len(data_parts) >= 3:
+        amount = float(data_parts[2])
+        payment_type = data_parts[1]
+    else:
+        await callback.answer("❌ Ошибка", show_alert=True)
+        return
+
+    # Создаем описание
+    if payment_type == "stars":
+        stars_data = get_user_data(user_id, "stars")
+        description = f"⭐Telegram Stars"
+    elif payment_type == "premium":
+        premium_data = get_user_data(user_id, "premium")
+        description = f"👑Telegram Premium"
+    elif payment_type == "ton":
+        ton_data = get_user_data(user_id, "ton_purchase")
+        description = f"💎TON"
+    else:
+        description = f"Оплата {amount/0.97}₽"
+
+    # Создаем счет
+    wait_msg = await callback.message.answer("Создаю счет...")
+
+    from username_checker import create_crypto_invoice
+    result = await create_crypto_invoice(amount, description, f"{payment_type}_{user_id}")
+
+    await delete_user_message(user_id, wait_msg.message_id)
+
+    if result["success"]:
+        # Сохраняем информацию о платеже для отслеживания
+        if user_id not in user_data:
+            user_data[user_id] = {}
+        if "pending_invoices" not in user_data[user_id]:
+            user_data[user_id]["pending_invoices"] = {}
+
+        user_data[user_id]["pending_invoices"][result["invoice_id"]] = {
+            "type": payment_type,
+            "amount": amount/0.97,
+            "time": time.time(),
+            "notified": False
+        }
+
+        # Запускаем фоновую проверку
+        asyncio.create_task(track_payment(user_id, result["invoice_id"], payment_type))
+
+        # Простая кнопка без "Я оплатил"
+        text = (
+            f" {description}\n\n"
+            f"❗Коммисия: 3%\n"
+            f"💰Сумма: {round(amount/0.97,1)} ₽*\n"
+            f"⏱ Счет действителен 1 час"
+        )
+
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text=f"Оплатить {amount*1.03}₽", url=result["pay_url"])],
+            [InlineKeyboardButton(text="❌Отмена", callback_data=payment_type)]
+        ])
+
+        # Отправляем сообщение
+        try:
+            if payment_type == "stars":
+                sent_message = await callback.message.answer_photo(caption=text, reply_markup=keyboard, parse_mode="Markdown")
+            elif payment_type == "premium":
+                sent_message = await callback.message.answer_photo(caption=text, reply_markup=keyboard, parse_mode="Markdown")
+            elif payment_type == "ton":
+                sent_message = await callback.message.answer_photo(caption=text, reply_markup=keyboard, parse_mode="Markdown")
+            else:
+                sent_message = await callback.message.answer(text, reply_markup=keyboard, parse_mode="Markdown")
+        except:
+            sent_message = await callback.message.answer(text, reply_markup=keyboard, parse_mode="Markdown")
+
+        await save_and_delete_previous(user_id, sent_message.message_id)
+    else:
+        await callback.message.answer(f"❌Ошибка: {result.get('error', 'Неизвестная ошибка')}")
+
+    await callback.answer()
+
+    # ===== ФОНОВАЯ ПРОВЕРКА ПЛАТЕЖЕЙ =====
+
+
+async def track_payment(user_id: int, invoice_id: str, payment_type: str):
+    """Проверяет статус платежа каждые 10 секунд"""
+    from username_checker import check_invoice_status
+
+    for _ in range(36):  # 6 минут
+        await asyncio.sleep(10)
+
+        status = await check_invoice_status(invoice_id)
+        if status.get("status") == "paid":
+            await bot.send_message(
+                user_id,
+                f"✅ Оплата подтверждена! Спасибо за покупку!"
+            )
+            # Здесь можно добавить активацию товара
+            break
+
+
+async def check_invoice_status(invoice_id: str):
+    """Проверяет статус счета в CryptoBot"""
+    from username_checker import CRYPTO_TOKEN
+    import aiohttp
+
+    url = "https://pay.crypt.bot/api/getInvoices"
+    headers = {"Crypto-Pay-API-Token": CRYPTO_TOKEN}
+    params = {"invoice_ids": invoice_id}
+
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url, params=params, headers=headers) as resp:
+            data = await resp.json()
+            if data.get("ok") and data["result"]["items"]:
+                return {"status": data["result"]["items"][0]["status"]}
+    return {"status": "unknown"}
 
 # ===== ЗАПУСК =====
 async def main():
+    # Подключаем Telethon при запуске бота
+    from username_checker import ensure_client
+    await ensure_client()
+    print("✅ Telethon готов к работе")
+    logging.basicConfig(level=logging.INFO)
+
     print("=" * 50)
     print("🤖 Бот запускается...")
+    print("🔍 TON Checker: API проверка активирована")
+    print("👤 Username Checker: Telethon проверка в отдельном файле")
+    print("🧹 Удаление сообщений: Включено")
+    print("=" * 50)
 
     try:
+        global TON_RUB
+        TON_RUB = await get_ton_price()
+        print(f"💰 Курс TON: {TON_RUB}₽")
+
         me = await bot.get_me()
         print(f"✅ Бот: @{me.username}")
-        print(f"👤 Имя: {me.first_name}")
+
         print("=" * 50)
-        print("🎯 Особенности:")
-        print("✅ Автоудаление сообщений")
-        print("✅ Проверка существования юзернейма")
-        print("✅ Проверка TON адреса на валидность и существование")
-        print("✅ Надежное хранение данных пользователя")
-        print("✅ Все ответы удаляются после нового действия")
-        print("✅ Работает проверка подписки")
-        print("✅ Все функции рабочие")
+        print("📋 Команды:")
+        print("/start /menu /stars /ton /premium")
         print("=" * 50)
-        print("📊 База данных: bot_database.db")
-        print("🖼 Изображения: папка images/")
+        print("⏳ Ожидаю сообщений...")
         print("=" * 50)
 
-        await dp.start_polling(bot)
+        await dp.start_polling(bot, skip_updates=True)
 
-    except KeyboardInterrupt:
-        print("\n🛑 Бот останавливается...")
     except Exception as e:
-        print(f"\n❌ Ошибка: {e}")
-        import traceback
-        traceback.print_exc()
+        print(f"❌ Ошибка запуска: {e}")
     finally:
         await bot.session.close()
-        print("✅ Бот завершил работу")
-
 
 if __name__ == "__main__":
-    # Настройка логирования
-    logging.basicConfig(level=logging.INFO, stream=sys.stdout)
-    
-    # Запуск бота
     asyncio.run(main())
