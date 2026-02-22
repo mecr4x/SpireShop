@@ -24,16 +24,14 @@ CACHE_TIME = 300  # 5 минут
 client = TelegramClient('telegram_session', API_ID, API_HASH)
 client_ready = False
 
-
 async def ensure_client():
-    """Подключает клиент один раз и держит открытым"""
     global client_ready
     if not client_ready:
-        print("🔄 Подключение к Telethon...")
-        await client.start(phone=PHONE, password=PASSWORD)
+        await client.connect()
+        if not await client.is_user_authorized():
+            await client.start(phone=PHONE)  # если сессия есть, код не запросит
         client_ready = True
-        me = await client.get_me()
-        print(f"✅ Telethon подключен как @{me.username}")
+        print("✅ Telethon готов")
 
 
 async def _real_check_username(username: str):
