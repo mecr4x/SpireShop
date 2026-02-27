@@ -71,7 +71,8 @@ class Form(StatesGroup):
     waiting_for_stars_amount = State()
     waiting_for_friend_username = State()
     waiting_for_ton_address = State()
-    waiting_for_ton_amount = State()
+    waiting_for_ton_amount = State()  # 👈 ЭТО ДОЛЖНО БЫТЬ
+    waiting_for_ton_friend_username = State()
     waiting_for_premium_friend = State()
 
 
@@ -87,45 +88,6 @@ def save_user_data(user_id, key, value):
 
 def get_user_data(user_id, key):
     return user_data.get(user_id, {}).get(key)
-
-
-# ===== ФУНКЦИИ ДЛЯ TON =====
-def is_valid_ton_format(address: str) -> bool:
-    """Проверка формата адреса TON"""
-    if not address or not isinstance(address, str):
-        return False
-
-    address = address.strip()
-
-    # Проверка длины
-    if len(address) < 48 or len(address) > 67:
-        return False
-
-    # Проверка префиксов
-    valid_prefixes = ['UQ', 'EQ', 'kQ', '0Q']
-    return any(address.startswith(prefix) for prefix in valid_prefixes)
-
-
-async def check_ton_address_exists(address: str) -> tuple[bool, str]:
-    """Проверка существования адреса TON через API"""
-    try:
-        async with aiohttp.ClientSession() as session:
-            # Используем TonCenter API
-            url = "https://toncenter.com/api/v2/getAddressInformation"
-            params = {"address": address}
-
-            async with session.get(url, params=params, timeout=10) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    if data.get("ok"):
-                        return True, "✅ Адрес существует и валиден"
-                    else:
-                        return False, "❌Указанный вами адрес не корректен"
-                else:
-                    return False, "❌Указанный вами адрес не корректен"
-    except Exception as e:
-        return False, f"❌ Ошибка сети: {str(e)}"
-
 
 async def get_ton_price():
     """Получение курса TON"""
@@ -145,10 +107,10 @@ async def get_ton_price():
 @router.message(Command("start"))
 async def start_cmd(message: Message):
     text = (
-        "Добро пожаловать!\n\n"
-        "Spire — магазин для покупки Telegram Stars, TON и Premium "
+        "<b>Добро пожаловать!</b>\n\n"
+        "<b>Spire</b> — магазин для покупки Telegram Stars, TON и Premium "
         "дешевле, чем в приложении и без верификации.\n\n"
-        "❗Чтобы продолжить подпишитесь на наш канал:"
+        "<tg-emoji emoji-id=\"5274099962655816924\">❗️</tg-emoji><b>Чтобы продолжить подпишитесь на наш канал:</b>"
     )
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
@@ -186,7 +148,7 @@ async def check_sub(callback: CallbackQuery):
 async def menu_cmd(message: Message):
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="⭐️ Купить звёзды", callback_data="stars")],
-        [InlineKeyboardButton(text="💎 Купить TON", callback_data="ton")],
+        [InlineKeyboardButton(text="💎 Пополнить TON", callback_data="ton")],
         [InlineKeyboardButton(text="👑 Купить Premium", callback_data="premium")],
         [InlineKeyboardButton(text="🆘 Поддержка", url=f"https://t.me/{SUPPORT_USERNAME[1:]}")]
     ])
@@ -206,11 +168,10 @@ async def stars_cmd(message: Message, state: FSMContext):
     await state.clear()
 
     text = (
-        "⭐️Telegram Stars\n\n"
-        "💰Курс к рублю: 1.7₽\n"
+        "<tg-emoji emoji-id=\"5924870095925942277\">⭐️</tg-emoji><b>Telegram Stars</b>\n\n"
         "Минимальное количество: 50\n"
         "Максимальное количество: 1,000,000\n\n"
-        "✏️Введите количество звезд для покупки:"
+        "<tg-emoji emoji-id=\"5470060791883374114\">✍️</tg-emoji>Введите количество звёзд для покупки:"
     )
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
@@ -253,15 +214,15 @@ async def process_stars_amount(message: Message, state: FSMContext):
         })
 
         text = (
-            f"⭐️Telegram Stars\n\n"
-            f"❗️Количество: {star_value}\n"
-            f"💰 Стоимость: {formulastar}₽\n\n"
+            f"<tg-emoji emoji-id=\"5924870095925942277\">⭐️</tg-emoji><b>Telegram Stars</b>\n\n"
+            f"<tg-emoji emoji-id=\"5204330443725347173\">⭐️</tg-emoji><b>Вы выбрали:</b> {star_value} звёзд\n"
+            f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Стоимость:</b> {formulastar}₽\n\n"
             f"Для кого вы приобретаете:"
         )
 
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="💫 Купить себе", callback_data="buy_stars_self")],
-            [InlineKeyboardButton(text="🎁 Подарить другу", callback_data="gift_stars_friend")],
+            [InlineKeyboardButton(text="💫Купить себе", callback_data="buy_stars_self")],
+            [InlineKeyboardButton(text="🎁Подарить другу", callback_data="gift_stars_friend")],
             [InlineKeyboardButton(text="Назад", callback_data="stars")]
         ])
 
@@ -274,7 +235,7 @@ async def process_stars_amount(message: Message, state: FSMContext):
         await state.clear()
 
     except ValueError:
-        error_msg = await message.answer("❌ Пожалуйста, введите корректное число")
+        error_msg = await message.answer("❌Пожалуйста, введите корректное число")
         await save_and_delete_previous(message.from_user.id, error_msg.message_id)
         await asyncio.sleep(2)
         await delete_user_message(message.from_user.id, error_msg.message_id)
@@ -286,7 +247,7 @@ async def buy_stars_self_callback(callback: CallbackQuery):
     stars_data = get_user_data(user_id, "stars")
 
     if not stars_data:
-        await callback.answer("❌ Сначала выберите количество звёзд", show_alert=True)
+        await callback.answer("❌Сначала выберите количество звёзд", show_alert=True)
         return
 
     star_value = stars_data['star_value']
@@ -318,17 +279,17 @@ async def buy_stars_self_callback(callback: CallbackQuery):
         return
 
     text = (
-        f"⭐️Telegram Stars\n\n"
-        f"❗️Количество: {star_value} звёзд\n"
-        f"💰 Стоимость: {formulastar}₽ \n"
-        f"👤 Получатель: {username}\n\n"
+        f"<tg-emoji emoji-id=\"5924870095925942277\">⭐️</tg-emoji><b>Telegram Stars</b>\n\n"
+        f"<tg-emoji emoji-id=\"5204330443725347173\">⭐️</tg-emoji><b>Вы выбрали:</b> {star_value} звёзд\n"
+        f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Стоимость:</b> {formulastar}₽ \n"
+        f"<tg-emoji emoji-id=\"5255975823436973213\">🎁</tg-emoji><b>Получатель:</b> {username}\n\n"
         f"Выберите способ оплаты:"
     )
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🏦СБП", callback_data=f"sbp_stars_{formulastar}")],
         [InlineKeyboardButton(text="💎Cryptobot", callback_data=f"crypto_stars_{round (formulastar /0.97,1)}")],
-        [InlineKeyboardButton(text="❌ Отмена", callback_data="back_to_stars_choice")]
+        [InlineKeyboardButton(text="❌Отмена", callback_data="back_to_stars_choice")]
     ])
 
     try:
@@ -353,10 +314,10 @@ async def gift_stars_friend_callback(callback: CallbackQuery, state: FSMContext)
     formulastar = stars_data['formulastar']
 
     text = (
-        f"⭐️Telegram Stars\n\n"
-        f"❗️Количество: {star_value} звёзд\n"
-        f"💰Стоимость: {formulastar}₽ \n\n"
-        f"👤Введите @username получателя:"
+        f"<tg-emoji emoji-id=\"5924870095925942277\">⭐️</tg-emoji><b>Telegram Stars</b>\n\n"
+           f"<tg-emoji emoji-id=\"5204330443725347173\">⭐️</tg-emoji><b>Вы выбрали:</b> {star_value} звёзд\n"
+        f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Стоимость:</b> {formulastar}₽\n\n"
+        f"<tg-emoji emoji-id=\"5255975823436973213\">🎁</tg-emoji>Введите @username получателя:"
     )
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
@@ -388,15 +349,15 @@ async def back_to_stars_choice_callback(callback: CallbackQuery):
     star_ton = stars_data['star_ton']
 
     text = (
-        f"⭐️Telegram Stars\n\n"
-        f"❗️Количество: {star_value} звёзд\n"
-        f"💰 Стоимость: {formulastar}₽ \n\n"
+        f"<tg-emoji emoji-id=\"5924870095925942277\">⭐️</tg-emoji><b>Telegram Stars</b>\n\n"
+        f"<tg-emoji emoji-id=\"5204330443725347173\">⭐️</tg-emoji><b>Вы выбрали:</b> {star_value} звёзд\n"
+        f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Стоимость:</b> {formulastar}₽ \n\n"
         f"Для кого вы приобретаете:"
     )
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="💫 Купить себе", callback_data="buy_stars_self")],
-        [InlineKeyboardButton(text="🎁 Подарить другу", callback_data="gift_stars_friend")],
+        [InlineKeyboardButton(text="💫Купить себе", callback_data="buy_stars_self")],
+        [InlineKeyboardButton(text="🎁Подарить другу", callback_data="gift_stars_friend")],
         [InlineKeyboardButton(text="Назад", callback_data="stars")]
     ])
 
@@ -459,10 +420,10 @@ async def process_friend_username(message: Message, state: FSMContext):
     star_ton = stars_data['star_ton']
 
     text = (
-        f"⭐️Telegram Stars\n\n"
-        f"❗️Количество: {star_value} звёзд\n"
-        f"💰 Стоимость: {formulastar}₽\n"
-        f"👤 Получатель: {username}\n\n"
+        f"<tg-emoji emoji-id=\"5924870095925942277\">⭐️</tg-emoji><b>Telegram Stars</b>\n\n"
+        f"<tg-emoji emoji-id=\"5204330443725347173\">⭐️</tg-emoji><b>Вы выбрали:</b> {star_value} звёзд\n"
+        f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Стоимость:</b> {formulastar}₽ \n"
+        f"<tg-emoji emoji-id=\"5255975823436973213\">🎁</tg-emoji><b>Получатель:</b> {username}\n\n"
         f"Выберите способ оплаты:"
     )
 
@@ -481,6 +442,8 @@ async def process_friend_username(message: Message, state: FSMContext):
     await state.clear()
 
 
+# ===== ВСЁ ДЛЯ TON (ОДНИМ БЛОКОМ) =====
+
 # ===== КОМАНДА /TON =====
 @router.message(Command("ton"))
 async def ton_cmd(message: Message, state: FSMContext):
@@ -489,10 +452,13 @@ async def ton_cmd(message: Message, state: FSMContext):
     TON_RUB = await get_ton_price()
 
     text = (
-        f"💎 TON\n\n"
-        f"💰Курс к рублю: {TON_RUB + 11}₽\n"
-        f"Минимальное количество: 1 TON\n\n"
-        f"✏️Введите адрес кошелька для получения TON:"
+        f"<tg-emoji emoji-id=\"5462902520215002477\">💎</tg-emoji><b>TON</b>\n\n"
+        f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Курс к рублю:</b> {TON_RUB + 11}₽\n"
+        f"<tg-emoji emoji-id=\"5447644880824181073\">⚠️</tg-emoji>️<b>Примечание:</b> TON поступает не на кошелек, а на Telegram аккаунт по @username."
+        f"Использовать TON можно <b>только</b> в качестве покупки подарков на Telegram маркете, "
+        f"а так же для оплаты за посты в Telegram каналах!\n\n"
+        f"<tg-emoji emoji-id=\"5470060791883374114\">✍️</tg-emoji>Введите количество TON для покупки:\n"
+        f"(Целое значение большее 1)"
     )
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
@@ -506,115 +472,53 @@ async def ton_cmd(message: Message, state: FSMContext):
         sent_message = await message.answer(text, reply_markup=keyboard)
 
     await save_and_delete_previous(message.from_user.id, sent_message.message_id)
-    await state.set_state(Form.waiting_for_ton_address)
-
-
-# ===== ОБРАБОТКА АДРЕСА TON (с API проверкой) =====
-@router.message(Form.waiting_for_ton_address)
-async def process_ton_address(message: Message, state: FSMContext):
-    await delete_user_message(message.from_user.id, message.message_id)
-
-    address = message.text.strip()
-
-    # Проверка формата
-    if not is_valid_ton_format(address):
-        text = (
-            f"❌Указанный вами адрес не корректен\n\n"
-            f"📥Адрес: {address}"
-        )
-
-        keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="Попробовать снова", callback_data="ton")]
-        ])
-
-        sent_message = await message.answer(text, reply_markup=keyboard)
-        await save_and_delete_previous(message.from_user.id, sent_message.message_id)
-        await state.clear()
-        return
-
-    # Проверка существования через API
-    checking_msg = await message.answer("⏳ Проверяю адрес через сеть TON...")
-
-    exists, feedback = await check_ton_address_exists(address)
-
-    await delete_user_message(message.from_user.id, checking_msg.message_id)
-
-    if not exists:
-        text = f"{feedback}\n\n📥Адрес:{address}"
-
-        keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text=" Попробовать снова", callback_data="ton")]
-        ])
-
-        sent_message = await message.answer(text, reply_markup=keyboard)
-        await save_and_delete_previous(message.from_user.id, sent_message.message_id)
-        await state.clear()
-        return
-
-    # Адрес валиден и существует
-    save_user_data(message.from_user.id, "ton_address", address)
-
-    text = (
-        f"💎 TON\n\n"
-        f"📥 Адрес: {address}\n\n"
-        f"✏️ Теперь введите сумму в TON для покупки:"
-    )
-
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="Назад", callback_data="ton")]
-    ])
-
-    sent_message = await message.answer(text, reply_markup=keyboard)
-    await save_and_delete_previous(message.from_user.id, sent_message.message_id)
     await state.set_state(Form.waiting_for_ton_amount)
 
-
-# ===== ОБРАБОТКА СУММЫ TON =====
+#======ОБРАБОТКА СУММЫ ТОН======
 @router.message(Form.waiting_for_ton_amount)
 async def process_ton_amount(message: Message, state: FSMContext):
+    user_id = message.from_user.id
     await delete_user_message(message.from_user.id, message.message_id)
 
     try:
-        ton_value = float(message.text.strip().replace(',', '.'))
+        # 🔥 Проверяем, что введено целое число (без точки)
+        text = message.text.strip()
 
-        if ton_value < 1:
-            error_msg = await message.answer("❌ Минимальное количество: 1 TON")
+        # Проверка: только цифры, никаких точек и запятых
+        if not text.isdigit():
+            error_msg = await message.answer("❌Введите целое число без дробной части (например: 5, 10, 100)")
             await save_and_delete_previous(message.from_user.id, error_msg.message_id)
             await asyncio.sleep(2)
             await delete_user_message(message.from_user.id, error_msg.message_id)
             return
 
-        # Расчет стоимости
-        formulaTON = round(ton_value * (TON_RUB + 11), 1)
+        ton_value = int(text)
 
-        # Получаем адрес
-        user_id = message.from_user.id
-        address = get_user_data(user_id, "ton_address")
-
-        if not address:
-            await message.answer("❌ Ошибка: адрес не найден. Начните заново.")
-            await state.clear()
+        if ton_value < 1:
+            error_msg = await message.answer("❌Введите целое значение от 1 TON")
+            await save_and_delete_previous(message.from_user.id, error_msg.message_id)
+            await asyncio.sleep(2)
+            await delete_user_message(message.from_user.id, error_msg.message_id)
             return
 
-        # Сохраняем данные
+        formulaTON = round(ton_value * (TON_RUB + 11), 1)
+
         save_user_data(user_id, "ton_purchase", {
             'ton_value': ton_value,
             'formulaTON': formulaTON,
-            'address': address
         })
 
         text = (
-            f"💎TON\n\n"
-            f"❗Количество: {ton_value} TON\n"
-            f"💰Стоимость: {formulaTON} ₽\n"
-            f"📥Адрес получения: {address}\n\n"
-            f"Выберите способ оплаты:"
+            f"<tg-emoji emoji-id=\"5462902520215002477\">💎</tg-emoji><b>TON</b>\n\n"
+            f"<tg-emoji emoji-id=\"5204330443725347173\">⭐️</tg-emoji><b>Вы выбрали:</b> {ton_value} TON\n"
+            f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Стоимость:</b> {formulaTON} ₽\n\n"
+            f"Для кого вы приобретаете?"
         )
 
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="🏦 СБП", callback_data=f"sbp_ton_{formulaTON}")],
-            [InlineKeyboardButton(text="💎Cryptobot", callback_data=f"crypto_ton_{round(formulaTON/0.97,1)}")],
-            [InlineKeyboardButton(text="❌ Отмена", callback_data="ton")]
+            [InlineKeyboardButton(text="💫Купить себе", callback_data="buy_ton_self")],
+            [InlineKeyboardButton(text="🎁Подарить другу", callback_data="gift_ton_friend")],
+            [InlineKeyboardButton(text="Назад", callback_data="ton")]
         ])
 
         try:
@@ -626,16 +530,151 @@ async def process_ton_amount(message: Message, state: FSMContext):
         await state.clear()
 
     except ValueError:
-        error_msg = await message.answer("❌ Пожалуйста, введите корректное число (например: 1.5 или 2)")
+        error_msg = await message.answer("❌ Пожалуйста, введите корректное целое число")
         await save_and_delete_previous(message.from_user.id, error_msg.message_id)
         await asyncio.sleep(2)
         await delete_user_message(message.from_user.id, error_msg.message_id)
 
 
+# ===== КУПИТЬ СЕБЕ =====
+@router.callback_query(F.data == "buy_ton_self")
+async def ton_self_callback(callback: CallbackQuery):
+    user_id = callback.from_user.id
+    data = get_user_data(user_id, "ton_purchase")
+
+    if not data:
+        await callback.answer("❌ Сначала выберите сумму", show_alert=True)
+        return
+
+    ton_value = data['ton_value']
+    formulaTON = data['formulaTON']
+
+    # Получаем username покупателя
+    username = callback.from_user.username
+    if not username:
+        username = f"id{user_id}"
+    else:
+        username = f"@{username}"
+
+    text = (
+        f"<tg-emoji emoji-id=\"5462902520215002477\">💎</tg-emoji><b>TON</b>\n\n"
+        f"<tg-emoji emoji-id=\"5204330443725347173\">⭐️</tg-emoji><b>Вы выбрали:</b> {ton_value} TON\n"
+        f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Стоимость:</b> {formulaTON}₽\n"
+        f"<tg-emoji emoji-id=\"5255975823436973213\">🎁</tg-emoji><b>Получатель</b>: {username}\n\n"
+        f"Выберите способ оплаты:"
+    )
+
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🏦СБП", callback_data=f"sbp_ton_{formulaTON}")],
+        [InlineKeyboardButton(text="💎CryptoBot", callback_data=f"crypto_ton_{formulaTON}")],
+        [InlineKeyboardButton(text="❌Отмена", callback_data="ton")]
+    ])
+
+    try:
+        sent = await callback.message.answer_photo( caption=text, reply_markup=keyboard)
+    except:
+        sent = await callback.message.answer(text, reply_markup=keyboard)
+
+    await save_and_delete_previous(user_id, sent.message_id)
+    await callback.answer()
+
+
+# ===== ПОДАРИТЬ ДРУГУ =====
+@router.callback_query(F.data == "gift_ton_friend")
+async def ton_friend_callback(callback: CallbackQuery, state: FSMContext):
+    user_id = callback.from_user.id
+    data = get_user_data(user_id, "ton_purchase")
+
+    if not data:
+        await callback.answer("❌ Сначала выберите сумму", show_alert=True)
+        return
+
+    ton_value = data['ton_value']
+    formulaTON = data['formulaTON']
+
+    text = (
+        f"<tg-emoji emoji-id=\"5462902520215002477\">💎</tg-emoji><b>TON</b>\n\n"
+        f"<tg-emoji emoji-id=\"5204330443725347173\">⭐️</tg-emoji><b>Вы выбрали:</b> {ton_value} TON\n"
+        f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Стоимость:</b> {formulaTON}₽\n\n"
+        f"<tg-emoji emoji-id=\"5470060791883374114\">✍️</tg-emoji>Введите @username получателя:"
+    )
+
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="Назад", callback_data="buy_ton_self")]
+    ])
+
+    try:
+        sent = await callback.message.answer_photo( caption=text, reply_markup=keyboard)
+    except:
+        sent = await callback.message.answer(text, reply_markup=keyboard)
+
+    await save_and_delete_previous(user_id, sent.message_id)
+    await state.set_state(Form.waiting_for_ton_friend_username)
+    await callback.answer()
+
+
+# ===== ОБРАБОТКА USERNAME ДРУГА =====
+@router.message(Form.waiting_for_ton_friend_username)
+async def process_ton_friend(message: Message, state: FSMContext):
+    user_id = message.from_user.id
+    await delete_user_message(user_id, message.message_id)
+
+    username = message.text.strip().replace('@', '')
+    if not username:
+        error = await message.answer("❌ Введите username")
+        await save_and_delete_previous(user_id, error.message_id)
+        await asyncio.sleep(2)
+        await delete_user_message(user_id, error.message_id)
+        return
+
+    # Проверка username (Telethon)
+    from username_checker import check_username
+    check_msg = await message.answer("🔍 Проверка...")
+    result = await check_username(username)
+    await delete_user_message(user_id, check_msg.message_id)
+
+    if not result['exists']:
+        error = await message.answer(f"❌ @{username} не найден")
+        await save_and_delete_previous(user_id, error.message_id)
+        await state.clear()
+        return
+
+    data = get_user_data(user_id, "ton_purchase")
+    if not data:
+        await message.answer("❌ Ошибка данных")
+        await state.clear()
+        return
+
+    ton_value = data['ton_value']
+    formulaTON = data['formulaTON']
+
+    text = (
+        f"<tg-emoji emoji-id=\"5462902520215002477\">💎</tg-emoji><b>TON</b>\n\n"
+        f"<tg-emoji emoji-id=\"5204330443725347173\">⭐️</tg-emoji><b>Вы выбрали:</b> {ton_value} TON\n"
+        f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Стоимость:</b> {formulaTON}₽\n"
+        f"<tg-emoji emoji-id=\"5255975823436973213\">🎁</tg-emoji><b>Получатель</b>: @{username}\n\n"
+        f"Выберите способ оплаты:"
+    )
+
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🏦СБП", callback_data=f"sbp_ton_{formulaTON}")],
+        [InlineKeyboardButton(text="🔐CryptoBot", callback_data=f"crypto_ton_{formulaTON}")],
+        [InlineKeyboardButton(text="❌Отмена", callback_data="ton")]
+    ])
+
+    try:
+        sent = await message.answer_photo (caption=text, reply_markup=keyboard)
+    except:
+        sent = await message.answer(text, reply_markup=keyboard)
+
+    await save_and_delete_previous(user_id, sent.message_id)
+    await state.clear()
+
 # ===== КОМАНДА /PREMIUM =====
 @router.message(Command("premium"))
 async def premium_cmd(message: Message):
-    text = "👑Telegram Premium\n\n🗓Выберите период подписки:"
+    text = ("<tg-emoji emoji-id=\"5467406098367521267\">👑</tg-emoji><b>Telegram Premium</b>\n\n"
+            "<tg-emoji emoji-id=\"5274055917766202507\">🗓</tg-emoji>Выберите период подписки:")
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="Premium - 12 месяцев", callback_data="premium_12")],
@@ -677,9 +716,9 @@ async def premium_period_callback(callback: CallbackQuery, state: FSMContext):
     })
 
     text = (
-        f"👑 Telegram Premium\n\n"
-        f"📅Срок: {period}\n"
-        f"💰Стоимость: {priceprem}₽\n\n"
+        f"<tg-emoji emoji-id=\"5467406098367521267\">👑</tg-emoji><b>Telegram Premium</b>\n\n"
+        f"<tg-emoji emoji-id=\"5274055917766202507\">🗓</tg-emoji>Срок: {period}\n"
+        f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji>Стоимость: {priceprem}₽\n\n"
         f"Для кого вы приобретаете:"
     )
 
@@ -745,10 +784,10 @@ async def buy_premium_self_callback(callback: CallbackQuery):
     else:
         # У пользователя НЕТ Premium - можно оформлять
         text = (
-            f"👑Telegram Premium\n\n"
-            f"📅Срок: {period}\n"
-            f"💰Стоимость: {priceprem}₽\n"
-            f"👤Получатель: {username}\n\n"
+            f"<tg-emoji emoji-id=\"5467406098367521267\">👑</tg-emoji><b>Telegram Premium</b>\n\n"
+            f"<tg-emoji emoji-id=\"5274055917766202507\">🗓</tg-emoji><b>Срок:<b> {period}\n"
+            f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Стоимость:</b> {priceprem}₽\n"
+            f"<tg-emoji emoji-id=\"5255975823436973213\">🎁</tg-emoji><b>Получатель</b>: {username}\n\n"
             f"Выберите способ оплаты:"
         )
 
@@ -780,9 +819,9 @@ async def gift_premium_friend_callback(callback: CallbackQuery, state: FSMContex
     priceprem = premium_data['priceprem']
 
     text = (
-        f"👑Telegram Premium\n\n"
-        f"📆Срок: {period}\n"
-        f"💰Стоимость: {priceprem}₽\n\n"
+        f"<tg-emoji emoji-id=\"5467406098367521267\">👑</tg-emoji><b>Telegram Premium</b>\n\n"
+        f"<tg-emoji emoji-id=\"5274055917766202507\">🗓</tg-emoji><b>Срок:</b> {period}\n"
+        f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Стоимость:</b> {priceprem}₽\n\n"
         f"👤Введите @username получателя:"
     )
 
@@ -869,10 +908,10 @@ async def process_premium_friend(message: Message, state: FSMContext):
     else:
         # У пользователя НЕТ Premium - можно оформлять
         text = (
-            f"👑Telegram Premium\n\n"
-            f"📆Срок: {period}\n"
-            f"💰Стоимость: {priceprem}₽\n"
-            f"👤Пользователь: {username}\n\n"
+            f"<tg-emoji emoji-id=\"5467406098367521267\">👑</tg-emoji><b>Telegram Premium</b>\n\n"
+            f"<tg-emoji emoji-id=\"5274055917766202507\">🗓</tg-emoji><b>Срок:</b> {period}\n"
+            f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Стоимость:</b> {priceprem}₽\n"
+            f"<tg-emoji emoji-id=\"5255975823436973213\">🎁</tg-emoji><b>Получатель:</b> {username}\n\n"
             f"Выберите способ оплаты:"
         )
 
@@ -915,106 +954,134 @@ async def premium_btn(callback: CallbackQuery):
     await callback.answer()
 
 
-# ===== ОПЛАТА =====
 @router.callback_query(F.data.startswith("crypto_"))
 async def crypto_payment(callback: CallbackQuery):
     user_id = callback.from_user.id
-    data_parts = callback.data.split("_")
+    parts = callback.data.split("_")
 
-    if len(data_parts) >= 3:
-        amount = float(data_parts[2])
-        payment_type = data_parts[1]
-    else:
+    if len(parts) < 3:
         await callback.answer("❌ Ошибка", show_alert=True)
         return
 
-    # Создаем описание
-    if payment_type == "stars":
-        stars_data = get_user_data(user_id, "stars")
-        description = f"⭐Telegram Stars"
-    elif payment_type == "premium":
-        premium_data = get_user_data(user_id, "premium")
-        description = f"👑Telegram Premium"
-    elif payment_type == "ton":
-        ton_data = get_user_data(user_id, "ton_purchase")
-        description = f"💎TON"
-    else:
-        description = f"Оплата {amount/0.97}₽"
+    # ✅ ЭТО УЖЕ ЕСТЬ
+    ptype = parts[1]  # stars, premium, ton
+    amount = float(parts[2])
 
-    # Создаем счет
+    # 👇 А ЭТО НУЖНО ДОБАВИТЬ
+    stars_data = get_user_data(user_id, "stars")
+    premium_data = get_user_data(user_id, "premium")
+    ton_data = get_user_data(user_id, "ton_purchase")
+
+    # Дальше определяем описание и комиссию
+    if ptype == "stars" and stars_data:
+        star_value = stars_data.get('star_value', '?')
+        description = f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> {star_value} звёзд"
+        base_price = round(star_value * 1.7, 1)
+        commission = round(amount - base_price, 1)
+
+    elif ptype == "premium" and premium_data:
+        period = premium_data.get('period', 'Premium')
+        description = f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> Telegram Premium на {period}"
+        base_prices = {"12 месяцев":3000, "6 месяцев": 1700, "3 месяца": 1300}
+        base_price = base_prices.get(period, amount)
+        commission = round(amount - base_price, 1)
+
+    elif ptype == "ton" and ton_data:
+        ton_value = ton_data.get('ton_value', '?')
+        description = f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> {ton_value} TON"
+        base_price = round(ton_value * TON_RUB, 1)
+        commission = round(amount - base_price, 1)
+
+    payload = f"{ptype}_{user_id}_{int(time.time())}"
+
+    # Дальше создаем счет...
     wait_msg = await callback.message.answer("Создаю счет...")
 
     from username_checker import create_crypto_invoice
-    result = await create_crypto_invoice(amount, description, f"{payment_type}_{user_id}")
+    result = await create_crypto_invoice(amount, description, payload)
 
     await delete_user_message(user_id, wait_msg.message_id)
 
     if result["success"]:
-        # Сохраняем информацию о платеже для отслеживания
+        # Сохраняем для отслеживания
         if user_id not in user_data:
             user_data[user_id] = {}
         if "pending_invoices" not in user_data[user_id]:
             user_data[user_id]["pending_invoices"] = {}
 
         user_data[user_id]["pending_invoices"][result["invoice_id"]] = {
-            "type": payment_type,
-            "amount": amount/0.97,
-            "time": time.time(),
-            "notified": False
+            "type": ptype,
+            "amount": amount,
+            "time": time.time()
         }
 
-        # Запускаем фоновую проверку
-        asyncio.create_task(track_payment(user_id, result["invoice_id"], payment_type))
+        asyncio.create_task(track_payment(user_id, result["invoice_id"], ptype))
 
-        # Простая кнопка без "Я оплатил"
+        # Отправляем ссылку
         text = (
-            f" {description}\n\n"
-            f"❗Коммисия: 3%\n"
-            f"💰Сумма: {round(amount/0.97,1)} ₽*\n"
-            f"⏱ Счет действителен 1 час"
+            f"<tg-emoji emoji-id=\"5199552030615558774\">🪙</tg-emoji><b>CryptoBot</b>\n\n"
+            f"{description}\n"
+            f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Сумма:</b> {round(amount,1)}₽ (комиссия {commission}₽)\n"
+            f"<tg-emoji emoji-id=\"5274099962655816924\">❗️</tg-emoji><b>Комиссия:</b>3%\n\n"
+            f"👇Нажмите кнопку для оплаты:"
         )
 
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text=f"Оплатить {amount*1.03}₽", url=result["pay_url"])],
-            [InlineKeyboardButton(text="❌Отмена", callback_data=payment_type)]
+            [InlineKeyboardButton(text=f"💳Оплатить", url=result["pay_url"])],
+            [InlineKeyboardButton(text="❌Отмена", callback_data=ptype)]
         ])
 
-        # Отправляем сообщение
+        # Отправляем с фото
         try:
-            if payment_type == "stars":
-                sent_message = await callback.message.answer_photo(caption=text, reply_markup=keyboard, parse_mode="Markdown")
-            elif payment_type == "premium":
-                sent_message = await callback.message.answer_photo(caption=text, reply_markup=keyboard, parse_mode="Markdown")
-            elif payment_type == "ton":
-                sent_message = await callback.message.answer_photo(caption=text, reply_markup=keyboard, parse_mode="Markdown")
+            if ptype == "stars":
+                sent = await callback.message.answer_photo( caption=text, reply_markup=keyboard,
+                                                           parse_mode="HTML")
+            elif ptype == "premium":
+                sent = await callback.message.answer_photo( caption=text, reply_markup=keyboard,
+                                                           parse_mode="HTML")
+            elif ptype == "ton":
+                sent = await callback.message.answer_photo(caption=text, reply_markup=keyboard,
+                                                           parse_mode="HTML")
             else:
-                sent_message = await callback.message.answer(text, reply_markup=keyboard, parse_mode="Markdown")
+                sent = await callback.message.answer(text, reply_markup=keyboard, parse_mode="HTML")
         except:
-            sent_message = await callback.message.answer(text, reply_markup=keyboard, parse_mode="Markdown")
+            sent = await callback.message.answer(text, reply_markup=keyboard, parse_mode="HTML")
 
-        await save_and_delete_previous(user_id, sent_message.message_id)
+        await save_and_delete_previous(user_id, sent.message_id)
     else:
-        await callback.message.answer(f"❌Ошибка: {result.get('error', 'Неизвестная ошибка')}")
+        # Ошибка
+        error_text = f"❌ Ошибка: {result.get('error', 'Неизвестная ошибка')}"
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🔙 Назад", callback_data=ptype)]
+        ])
+        sent = await callback.message.answer(error_text, reply_markup=keyboard)
+        await save_and_delete_previous(user_id, sent.message_id)
 
     await callback.answer()
 
-    # ===== ФОНОВАЯ ПРОВЕРКА ПЛАТЕЖЕЙ =====
-
 
 async def track_payment(user_id: int, invoice_id: str, payment_type: str):
-    """Проверяет статус платежа каждые 10 секунд"""
+    """Автоматически проверяет оплату каждые 10 секунд"""
     from username_checker import check_invoice_status
 
     for _ in range(36):  # 6 минут
         await asyncio.sleep(10)
 
-        status = await check_invoice_status(invoice_id)
-        if status.get("status") == "paid":
-            await bot.send_message(
-                user_id,
-                f"✅ Оплата подтверждена! Спасибо за покупку!"
-            )
-            # Здесь можно добавить активацию товара
+        result = await check_invoice_status(invoice_id)
+
+        if result.get("success") and result.get("status") == "paid":
+            try:
+                await bot.send_message(
+                    user_id,
+                    f"✅ <b>Оплата подтверждена!</b>\n\nСпасибо за покупку!\n/menu — вернуться в меню",
+                    parse_mode="HTML"
+                )
+                print(f"✅ Платеж {invoice_id} подтвержден")
+            except:
+                pass
+            break
+
+        if result.get("status") in ["expired", "cancelled"]:
             break
 
 
