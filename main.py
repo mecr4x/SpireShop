@@ -717,8 +717,8 @@ async def premium_period_callback(callback: CallbackQuery, state: FSMContext):
 
     text = (
         f"<tg-emoji emoji-id=\"5467406098367521267\">👑</tg-emoji><b>Telegram Premium</b>\n\n"
-        f"<tg-emoji emoji-id=\"5274055917766202507\">🗓</tg-emoji>Срок: {period}\n"
-        f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji>Стоимость: {priceprem}₽\n\n"
+        f"<tg-emoji emoji-id=\"5274055917766202507\">🗓</tg-emoji><b>Срок:</b> {period}\n"
+        f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Стоимость:</b> {priceprem}₽\n\n"
         f"Для кого вы приобретаете:"
     )
 
@@ -785,7 +785,7 @@ async def buy_premium_self_callback(callback: CallbackQuery):
         # У пользователя НЕТ Premium - можно оформлять
         text = (
             f"<tg-emoji emoji-id=\"5467406098367521267\">👑</tg-emoji><b>Telegram Premium</b>\n\n"
-            f"<tg-emoji emoji-id=\"5274055917766202507\">🗓</tg-emoji><b>Срок:<b> {period}\n"
+            f"<tg-emoji emoji-id=\"5274055917766202507\">🗓</tg-emoji><b>Срок:</b> {period}\n"
             f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Стоимость:</b> {priceprem}₽\n"
             f"<tg-emoji emoji-id=\"5255975823436973213\">🎁</tg-emoji><b>Получатель</b>: {username}\n\n"
             f"Выберите способ оплаты:"
@@ -822,7 +822,7 @@ async def gift_premium_friend_callback(callback: CallbackQuery, state: FSMContex
         f"<tg-emoji emoji-id=\"5467406098367521267\">👑</tg-emoji><b>Telegram Premium</b>\n\n"
         f"<tg-emoji emoji-id=\"5274055917766202507\">🗓</tg-emoji><b>Срок:</b> {period}\n"
         f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Стоимость:</b> {priceprem}₽\n\n"
-        f"👤Введите @username получателя:"
+        f"<tg-emoji emoji-id=\"5470060791883374114\">✍️</tg-emoji>Введите @username получателя:"
     )
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
