@@ -141,6 +141,33 @@ async def check_username(username: str) -> dict:
     except Exception as e:
         return {'exists': False, 'error': '❌ Пользователь не найден'}
 
+# Глобальная переменная для кода
+_pending_code = None
+
+def set_telethon_code(code: str):
+    """Устанавливает код для Telethon"""
+    global _pending_code
+    _pending_code = code
+
+async def get_code_from_var():
+    """Получает код из переменной"""
+    global _pending_code
+    code = _pending_code
+    _pending_code = None
+    return code
+
+# В ensure_client измени вызов:
+async def ensure_client():
+    global client_ready
+    if not client_ready:
+        await client.connect()
+        if not await client.is_user_authorized():
+            # Вместо input используем get_code_from_var
+            await client.send_code_request(PHONE)
+            code = await get_code_from_var()
+            await client.sign_in(phone=PHONE, code=code)
+        client_ready = True
+
 
 # ===== CRYPTOBOT ФУНКЦИИ =====
 async def create_crypto_invoice(amount_rub: float, description: str = "", payload: str = ""):
