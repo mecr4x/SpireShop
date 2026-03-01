@@ -102,25 +102,6 @@ async def get_ton_price():
     except:
         return 140
 
-@router.message(Command("code"))
-async def enter_code(message: Message, state: FSMContext):
-    """Ввод кода подтверждения через Telegram"""
-    code = message.text.replace("/code", "").strip()
-    
-    if not code:
-        await message.answer("❌ Введите код: /code 12345")
-        return
-    
-    # Сохраняем код в состояние
-    await state.update_data(telethon_code=code)
-    
-    # Отправляем код в Telethon (нужно модифицировать ensure_client)
-    from username_checker import set_telethon_code
-    set_telethon_code(code)
-    
-    await message.answer("✅ Код отправлен в Telethon")
-
-
 # ===== КОМАНДА /START =====
 @router.message(Command("start"))
 async def start_cmd(message: Message):
