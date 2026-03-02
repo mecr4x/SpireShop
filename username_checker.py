@@ -1,5 +1,10 @@
 # username_checker.py
 from telethon import TelegramClient
+import os
+from dotenv import load_dotenv
+load_dotenv()
+
+STRING_SESSION = os.getenv("STRING_SESSION")
 from telethon.errors import UsernameInvalidError, FloodWaitError, SessionPasswordNeededError
 import aiohttp
 import asyncio
