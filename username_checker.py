@@ -1,10 +1,13 @@
 # username_checker.py
 from telethon import TelegramClient
-import os
-from dotenv import load_dotenv
-load_dotenv()
+from telethon.sessions import StringSession
 
-STRING_SESSION = os.getenv("STRING_SESSION")
+# Вместо
+# client = TelegramClient('telegram_session', API_ID, API_HASH)
+
+# Используй
+STRING_SESSION = "1ApWapzMBu2nJAkIdDGcUQi2N7ToNOaX_q735Lew6U_WxU5FmlD-flNGsAl29jOK81AnawXdC4mEBlSJFEloW0SHGVb5X6oX19iupFfSjE5Ih5Z_hiniiTXQJNXs1cNpjoUvNw5K2XqoiOHPVjZappyJT3HbQ_MveWzd0llJ_v2Uyj_7OGMMpMdgCJASSQRLuwMm7SmoYS42L61-F8g0jB4UCIo_6MW9P_meZXx5_XARRRRFW-gblOQ0k6YFG96eK_WAsVZwjYuDnNm3sA-qwuXuI2gTX4T2UcFWVDiBp25E0Q-DRZETO_GadWafaLVOMtIvt5mn18G0UyqOf7Zwo_MZY5aLGyC8="  # вставь сюда свою строку
+client = TelegramClient(StringSession(STRING_SESSION), API_ID, API_HASH)
 from telethon.errors import UsernameInvalidError, FloodWaitError, SessionPasswordNeededError
 import aiohttp
 import asyncio
