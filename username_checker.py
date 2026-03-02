@@ -1,13 +1,6 @@
 # username_checker.py
 from telethon import TelegramClient
 from telethon.sessions import StringSession
-
-# Вместо
-# client = TelegramClient('telegram_session', API_ID, API_HASH)
-
-# Используй
-STRING_SESSION = "1ApWapzMBu2nJAkIdDGcUQi2N7ToNOaX_q735Lew6U_WxU5FmlD-flNGsAl29jOK81AnawXdC4mEBlSJFEloW0SHGVb5X6oX19iupFfSjE5Ih5Z_hiniiTXQJNXs1cNpjoUvNw5K2XqoiOHPVjZappyJT3HbQ_MveWzd0llJ_v2Uyj_7OGMMpMdgCJASSQRLuwMm7SmoYS42L61-F8g0jB4UCIo_6MW9P_meZXx5_XARRRRFW-gblOQ0k6YFG96eK_WAsVZwjYuDnNm3sA-qwuXuI2gTX4T2UcFWVDiBp25E0Q-DRZETO_GadWafaLVOMtIvt5mn18G0UyqOf7Zwo_MZY5aLGyC8="  # вставь сюда свою строку
-client = TelegramClient(StringSession(STRING_SESSION), API_ID, API_HASH)
 from telethon.errors import UsernameInvalidError, FloodWaitError, SessionPasswordNeededError
 import aiohttp
 import asyncio
@@ -23,7 +16,10 @@ load_dotenv()
 API_ID = 31990778  # 🔥 ТВОЙ API ID (число)
 API_HASH = "6d72f5bffdabc0a648943c49c4d95fd3"  # 🔥 ТВОЙ API HASH
 PHONE = "+79094717005"  # 🔥 ТВОЙ НОМЕР ТЕЛЕФОНА
-PASSWORD = "Serzh011" # 🔥 ПАРОЛЬ 2FA (если есть)
+PASSWORD = "Serzh011"  # 🔥 ПАРОЛЬ 2FA (если есть)
+
+# ===== СТРОКА СЕССИИ (полученная из генератора) =====
+STRING_SESSION = "1ApWapzMBu2nJAkIdDGcUQi2N7ToNOaX_q735Lew6U_WxU5FmlD-flNGsAl29jOK81AnawXdC4mEBlSJFEloW0SHGVb5X6oX19iupFfSjE5Ih5Z_hiniiTXQJNXs1cNpjoUvNw5K2XqoiOHPVjZappyJT3HbQ_MveWzd0llJ_v2Uyj_7OGMMpMdgCJASSQRLuwMm7SmoYS42L61-F8g0jB4UCIo_6MW9P_meZXx5_XARRRRFW-gblOQ0k6YFG96eK_WAsVZwjYuDnNm3sA-qwuXuI2gTX4T2UcFWVDiBp25E0Q-DRZETO_GadWafaLVOMtIvt5mn18G0UyqOf7Zwo_MZY5aLGyC8="
 
 # ===== CRYPTOBOT НАСТРОЙКИ =====
 CRYPTO_TOKEN = "513952:AA8SvhV7y2TSGXIsQ1Sjmu1jc6CZPxDAgJZ"
@@ -33,49 +29,27 @@ BOT_USERNAME = "spireshoptgbot"
 username_cache = {}
 CACHE_TIME = 300  # 5 минут
 
-# ===== TELETHON КЛИЕНТ =====
-# Создаем клиента один раз и используем его постоянно
-client = TelegramClient('telegram_session', API_ID, API_HASH)
-client_ready = False
-
+# ===== TELETHON КЛИЕНТ С STRING SESSION =====
+# Используем строковую сессию вместо файла
+client = TelegramClient(StringSession(STRING_SESSION), API_ID, API_HASH)
+client_ready = True  # Уже готов, так как используем сессию
 
 async def ensure_client():
     """
-    Подключает клиента Telethon если ещё не подключен.
-    Вызывается перед каждым использованием Telethon.
+    Проверяет что клиент подключен.
     """
     global client_ready
     if not client_ready:
         try:
             print("🔄 Подключение к Telethon...")
             await client.connect()
-
-            if not await client.is_user_authorized():
-                # Если нет сессии - запрашиваем код
-                await client.send_code_request(PHONE)
-                print(f"📱 Код отправлен на {PHONE}")
-
-                # ВНИМАНИЕ: здесь нужно ввести код в консоли!
-                # Это произойдет только при первом запуске
-                code = input("🔐 Введи код из Telegram: ").strip()
-
-                try:
-                    await client.sign_in(phone=PHONE, code=code)
-                except SessionPasswordNeededError:
-                    # Если включена двухфакторка
-                    pwd = input("🔑 Введи облачный пароль: ").strip()
-                    await client.sign_in(password=pwd)
-
+            client_ready = True
             me = await client.get_me()
             print(f"✅ Telethon готов! Аккаунт: @{me.username}")
-            client_ready = True
-
         except Exception as e:
             print(f"❌ Ошибка подключения Telethon: {e}")
             client_ready = False
-
     return client_ready
-
 
 async def check_username(username: str) -> dict:
     """
@@ -149,8 +123,6 @@ async def check_username(username: str) -> dict:
     except Exception as e:
         return {'exists': False, 'error': '❌ Пользователь не найден'}
 
-
-
 # ===== CRYPTOBOT ФУНКЦИИ =====
 async def create_crypto_invoice(amount_rub: float, description: str = "", payload: str = ""):
     """
@@ -199,7 +171,6 @@ async def create_crypto_invoice(amount_rub: float, description: str = "", payloa
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-
 async def check_invoice_status(invoice_id: str):
     """
     Проверяет статус счета в CryptoBot.
@@ -227,7 +198,6 @@ async def check_invoice_status(invoice_id: str):
     except Exception as e:
         return {"success": False, "status": "error"}
 
-
 # ===== ФУНКЦИЯ ДЛЯ ЗАКРЫТИЯ КЛИЕНТА =====
 async def close_client():
     """Закрывает клиент Telethon (вызывать при остановке бота)"""
@@ -236,7 +206,6 @@ async def close_client():
         await client.disconnect()
         client_ready = False
         print("👋 Telethon отключен")
-
 
 # ===== ТЕСТОВЫЙ ЗАПУСК =====
 if __name__ == "__main__":
@@ -253,6 +222,5 @@ if __name__ == "__main__":
         print(f"Результат: {invoice}")
 
         await close_client()
-
 
     asyncio.run(test())
