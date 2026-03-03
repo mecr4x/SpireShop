@@ -257,7 +257,7 @@ async def process_stars_amount(message: Message, state: FSMContext):
 
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="💫Купить себе", callback_data="buy_stars_self")],
-            [InlineKeyboardButton(text="Подарить другу", callback_data="gift_stars_friend", icon-custom_emoji_id=5203996991054432397)],
+            [InlineKeyboardButton(text="Подарить другу", callback_data="gift_stars_friend", icon_custom_emoji_id=5203996991054432397)],
             [InlineKeyboardButton(text="Назад", callback_data="stars")]
         ])
 
