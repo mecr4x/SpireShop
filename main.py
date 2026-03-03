@@ -152,6 +152,7 @@ async def menu_cmd(message: Message):
         [
             InlineKeyboardButton(text="Поддержка", url=f"https://t.me/{SUPPORT_USERNAME[1:]}", icon_custom_emoji_id = 6021798595739523148),
             InlineKeyboardButton(text="Информация", callback_data="info", icon_custom_emoji_id = 5258503720928288433)
+        ]
     ])
 
     try:
