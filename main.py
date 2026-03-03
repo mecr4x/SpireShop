@@ -173,7 +173,7 @@ async def info_callback(callback: CallbackQuery, state: FSMContext):
     )
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="Политика конфиденциальности", url="https://telegra.ph/Politika-konfidencialnosti-03-03-42", icon_custom_emoji_id="6021741567163767583",)],
+        [InlineKeyboardButton(text="Политика конфиденциальности", url="https://telegra.ph/Politika-konfidencialnosti-03-03-42", icon_custom_emoji_id="6021741567163767583")],
         [InlineKeyboardButton(text="Пользовательское соглашение", url="https://telegra.ph/Polzovatelskoe-soglashenie-03-03-16", icon_custom_emoji_id="6021741567163767583")],
         [InlineKeyboardButton(text=" Назад", callback_data="back_to_menu")],
     ])
@@ -322,7 +322,7 @@ async def buy_stars_self_callback(callback: CallbackQuery):
     )
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="СБП", callback_data=f"sbp_stars_{formulastar}", icon_custom_emoji_id ="5305413839066525446",)],
+        [InlineKeyboardButton(text="СБП", callback_data=f"sbp_stars_{formulastar}", icon_custom_emoji_id ="5305413839066525446")],
         [InlineKeyboardButton(text="💎Cryptobot", callback_data=f"crypto_stars_{round (formulastar /0.97,1)}")],
         [InlineKeyboardButton(text="❌Отмена", callback_data="back_to_stars_choice")]
     ])
@@ -463,7 +463,7 @@ async def process_friend_username(message: Message, state: FSMContext):
     )
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="СБП", callback_data=f"sbp_stars_friend_{formulastar}", icon_custom_emoji_id = "5305413839066525446",)],
+        [InlineKeyboardButton(text="СБП", callback_data=f"sbp_stars_friend_{formulastar}", icon_custom_emoji_id = "5305413839066525446")],
         [InlineKeyboardButton(text="💎Cryptobot", callback_data=f"crypto_stars_friend_{round (formulastar /0.97,1)}")],
         [InlineKeyboardButton(text="❌Отмена", callback_data="back_to_stars_choice")]
     ])
@@ -827,7 +827,7 @@ async def buy_premium_self_callback(callback: CallbackQuery):
         )
 
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="СБП", callback_data=f"sbp_premium_{priceprem}",icon_custom_emoji_id = "5305413839066525446",)],
+            [InlineKeyboardButton(text="СБП", callback_data=f"sbp_premium_{priceprem}",icon_custom_emoji_id = "5305413839066525446")],
             [InlineKeyboardButton(text="💎Cryptobot", callback_data=f"crypto_premium_{round(priceprem /0.97,1)}")],
             [InlineKeyboardButton(text="❌Отмена", callback_data="premium")]
         ])
@@ -951,7 +951,7 @@ async def process_premium_friend(message: Message, state: FSMContext):
         )
 
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="СБП", callback_data=f"sbp_premium_{priceprem}", icon_custom_emoji_id = "5305413839066525446",)],
+            [InlineKeyboardButton(text="СБП", callback_data=f"sbp_premium_{priceprem}", icon_custom_emoji_id = "5305413839066525446")],
             [InlineKeyboardButton(text="💎Cryptobot", callback_data=f"crypto_premium_{round(priceprem /0.97,1)}")],
             [InlineKeyboardButton(text="❌ Отмена", callback_data="premium")]
         ])
