@@ -162,11 +162,11 @@ async def menu_cmd(message: Message):
     await save_and_delete_previous(message.from_user.id, sent_message.message_id)
 
 
-# ===== КОМАНДА /INFO =====
-@router.message(Command("info"))
-async def info_cmd(message: Message, state: FSMContext):
+# ===== ОБРАБОТЧИК КНОПКИ "ИНФОРМАЦИЯ" =====
+@router.callback_query(F.data == "info")
+async def info_callback(callback: CallbackQuery, state: FSMContext):
     await state.clear()
-
+    
     text = (
         "<tg-emoji emoji-id=\"5258503720928288433\">ℹ️</tg-emoji><b>Информация</b>\n\n"
         "Здесь вы можете ознакомиться с важными документами сервиса:"
@@ -175,15 +175,26 @@ async def info_cmd(message: Message, state: FSMContext):
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="Политика конфиденциальности", url="https://telegra.ph/Politika-konfidencialnosti-03-03-42")],
         [InlineKeyboardButton(text="Пользовательское соглашение", url="https://telegra.ph/Polzovatelskoe-soglashenie-03-03-16")],
+        [InlineKeyboardButton(text=" Назад", callback_data="back_to_menu")],
     ])
     
     try:
-        photo = FSInputFile("images/info.jpg")
-        sent_message = await message.answer_photo(photo=photo, caption=text, reply_markup=keyboard)
+        # Редактируем существующее сообщение вместо отправки нового
+        if callback.message.photo:
+            await callback.message.edit_caption(caption=text, reply_markup=keyboard)
+        else:
+            await callback.message.edit_text(text, reply_markup=keyboard)
     except:
-        sent_message = await message.answer(text, reply_markup=keyboard)
-
-    await save_and_delete_previous(message.from_user.id, sent_message.message_id)
+        # Если не получается отредактировать, отправляем новое
+        try:
+            photo = FSInputFile("images/info.jpg")
+            sent_message = await callback.message.answer_photo(photo=photo, caption=text, reply_markup=keyboard)
+        except:
+            sent_message = await callback.message.answer(text, reply_markup=keyboard)
+        
+        await save_and_delete_previous(callback.from_user.id, sent_message.message_id)
+    
+    await callback.answer()  # Отвечаем на callback, чтобы убрать "часики" на кнопке
 
 
 # ===== КОМАНДА /STARS =====
