@@ -148,40 +148,42 @@ async def menu_cmd(message: Message):
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="<tg-emoji emoji-id=\"5924870095925942277\">⭐️</tg-emoji> Купить звёзды", callback_data="stars")],
         [InlineKeyboardButton(text="<tg-emoji emoji-id=\"5462902520215002477\">💎</tg-emoji> Пополнить TON", callback_data="ton")],
-        [InlineKeyboardButton(text="<tg-emoji emoji-id=\"5467406098367521267\">👑</tg-emoji>Купить Premium", callback_data="premium")],
-        [InlineKeyboardButton(text="🆘 Поддержка", url=f"https://t.me/{SUPPORT_USERNAME[1:]}")],[InlineKeyboardButton(text=@="ℹ️Информация", callback_data="info")],
+        [InlineKeyboardButton(text="<tg-emoji emoji-id=\"5467406098367521267\">👑</tg-emoji> Купить Premium", callback_data="premium")],
+        [InlineKeyboardButton(text="🆘 Поддержка", url=f"https://t.me/{SUPPORT_USERNAME[1:]}")],
+        [InlineKeyboardButton(text="ℹ️ Информация", callback_data="info")],
     ])
 
     try:
         photo = FSInputFile("images/menu.jpg")
         sent_message = await message.answer_photo(photo=photo, reply_markup=keyboard)
     except:
-        sent_message = await message.answer(reply_markup=keyboard)
+        sent_message = await message.answer("Меню:", reply_markup=keyboard)
 
     await save_and_delete_previous(message.from_user.id, sent_message.message_id)
 
-# ===== КОМАНДА /iNFO =====
+
+# ===== КОМАНДА /INFO =====
 @router.message(Command("info"))
 async def info_cmd(message: Message, state: FSMContext):
     await state.clear()
 
     text = (
-        "<tg-emoji emoji-id=\"5258503720928288433\">ℹ️</tg-emoji><b>Информация</b>"
+        "<tg-emoji emoji-id=\"5258503720928288433\">ℹ️</tg-emoji><b>Информация</b>\n\n"
+        "Здесь вы можете ознакомиться с важными документами сервиса:"
     )
 
- keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="<tg-emoji emoji-id=\"6021741567163767583\">💾</tg-emoji>Политика конфиденциальности",url=f"https://telegra.ph/Politika-konfidencialnosti-03-03-42" )],
-        [InlineKeyboardButton(text="<tg-emoji emoji-id=\"6021741567163767583\">💾</tg-emoji>Пользовательское соглашение", url=f"https://telegra.ph/Polzovatelskoe-soglashenie-03-03-16")]?
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="<tg-emoji emoji-id=\"6021741567163767583\">💾</tg-emoji> Политика конфиденциальности", url="https://telegra.ph/Politika-konfidencialnosti-03-03-42")],
+        [InlineKeyboardButton(text="<tg-emoji emoji-id=\"6021741567163767583\">💾</tg-emoji> Пользовательское соглашение", url="https://telegra.ph/Polzovatelskoe-soglashenie-03-03-16")],
     ])
-   try:
+    
+    try:
         photo = FSInputFile("images/info.jpg")
         sent_message = await message.answer_photo(photo=photo, caption=text, reply_markup=keyboard)
     except:
         sent_message = await message.answer(text, reply_markup=keyboard)
 
     await save_and_delete_previous(message.from_user.id, sent_message.message_id)
-
-
 
 
 # ===== КОМАНДА /STARS =====
