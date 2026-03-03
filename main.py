@@ -146,11 +146,11 @@ async def check_sub(callback: CallbackQuery):
 @router.message(Command("menu"))
 async def menu_cmd(message: Message):
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="<tg-emoji emoji-id=\"5924870095925942277\">⭐️</tg-emoji> Купить звёзды", callback_data="stars")],
-        [InlineKeyboardButton(text="<tg-emoji emoji-id=\"5462902520215002477\">💎</tg-emoji> Пополнить TON", callback_data="ton")],
-        [InlineKeyboardButton(text="<tg-emoji emoji-id=\"5467406098367521267\">👑</tg-emoji> Купить Premium", callback_data="premium")],
-        [InlineKeyboardButton(text="🆘 Поддержка", url=f"https://t.me/{SUPPORT_USERNAME[1:]}")],
-        [InlineKeyboardButton(text="ℹ️ Информация", callback_data="info")],
+        [InlineKeyboardButton(text="⭐️Купить звёзды", callback_data="stars")],
+        [InlineKeyboardButton(text="💎Пополнить TON", callback_data="ton")],
+        [InlineKeyboardButton(text="👑Купить Premium", callback_data="premium")],
+        [InlineKeyboardButton(text="🆘Поддержка", url=f"https://t.me/{SUPPORT_USERNAME[1:]}")],
+        [InlineKeyboardButton(text="ℹ️Информация", callback_data="info")],
     ])
 
     try:
@@ -173,8 +173,8 @@ async def info_cmd(message: Message, state: FSMContext):
     )
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="<tg-emoji emoji-id=\"6021741567163767583\">💾</tg-emoji> Политика конфиденциальности", url="https://telegra.ph/Politika-konfidencialnosti-03-03-42")],
-        [InlineKeyboardButton(text="<tg-emoji emoji-id=\"6021741567163767583\">💾</tg-emoji> Пользовательское соглашение", url="https://telegra.ph/Polzovatelskoe-soglashenie-03-03-16")],
+        [InlineKeyboardButton(text="Политика конфиденциальности", url="https://telegra.ph/Politika-konfidencialnosti-03-03-42")],
+        [InlineKeyboardButton(text="Пользовательское соглашение", url="https://telegra.ph/Polzovatelskoe-soglashenie-03-03-16")],
     ])
     
     try:
