@@ -26,19 +26,16 @@ BOT_USERNAME = "spireshoptgbot"
 username_cache = {}
 CACHE_TIME = 300
 
-# ===== TELETHON КЛИЕНТ (ОДИН РАЗ) =====
-from telethon import TelegramClient
-from telethon.sessions import StringSession
-
+# ===== TELETHON КЛИЕНТ =====
 client = TelegramClient(
     StringSession(STRING_SESSION), 
     API_ID, 
-    API_HASH,
-    update_queue_limit=1,  # 👈 ограничиваем обновления
-    auto_reconnect=False    # 👈 отключаем авто-переподключение
+    API_HASH
 )
+client_ready = True
+
 async def ensure_client():
-    """Только проверяет подключение, не запускает обновления"""
+    """Только проверяет подключение"""
     if not client.is_connected():
         await client.connect()
     return True
