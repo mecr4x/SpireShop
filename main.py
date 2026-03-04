@@ -204,7 +204,7 @@ async def stars_cmd(message: Message, state: FSMContext):
         "<tg-emoji emoji-id=\"5438391541288689158\">⭐️</tg-emoji><b>Telegram Stars</b>\n\n"
         "Минимальное количество: 50\n"
         "Максимальное количество: 1,000,000\n\n"
-        "<tg-emoji emoji-id=\"5470060791883374114\">✍️</tg-emoji>Введите количество звёзд для покупки:"
+        "Введите количество звёзд для покупки:"
     )
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
@@ -248,13 +248,13 @@ async def process_stars_amount(message: Message, state: FSMContext):
 
         text = (
             f"<tg-emoji emoji-id=\"5438391541288689158\">⭐️</tg-emoji><b>Telegram Stars</b>\n\n"
-            f"<tg-emoji emoji-id=\"5204330443725347173\">⭐️</tg-emoji><b>Вы выбрали:</b> {star_value} звёзд\n"
+            f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> {star_value} звёзд\n"
             f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Стоимость:</b> {formulastar}₽\n\n"
             f"Для кого вы приобретаете:"
         )
 
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="💫Купить себе", callback_data="buy_stars_self")],
+            [InlineKeyboardButton(text="Купить себе", callback_data="buy_stars_self", icon_custom_emoji_id = 5406604187683270743)],
             [InlineKeyboardButton(text="Подарить другу", callback_data="gift_stars_friend", icon_custom_emoji_id=5203996991054432397)],
             [InlineKeyboardButton(text="Назад", callback_data="stars")]
         ])
@@ -313,7 +313,7 @@ async def buy_stars_self_callback(callback: CallbackQuery):
 
     text = (
         f"<tg-emoji emoji-id=\"5438391541288689158\">⭐️</tg-emoji><b>Telegram Stars</b>\n\n"
-        f"<tg-emoji emoji-id=\"5204330443725347173\">⭐️</tg-emoji><b>Вы выбрали:</b> {star_value} звёзд\n"
+        f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> {star_value} звёзд\n"
         f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Стоимость:</b> {formulastar}₽ \n"
         f"<tg-emoji emoji-id=\"5255975823436973213\">🎁</tg-emoji><b>Получатель:</b> {username}\n\n"
         f"Выберите способ оплаты:"
@@ -348,9 +348,9 @@ async def gift_stars_friend_callback(callback: CallbackQuery, state: FSMContext)
 
     text = (
         f"<tg-emoji emoji-id=\"5438391541288689158\">⭐️</tg-emoji><b>Telegram Stars</b>\n\n"
-        f"<tg-emoji emoji-id=\"5204330443725347173\">⭐️</tg-emoji><b>Вы выбрали:</b> {star_value} звёзд\n"
+        f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> {star_value} звёзд\n"
         f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Стоимость:</b> {formulastar}₽\n\n"
-        f"<tg-emoji emoji-id=\"5255975823436973213\">🎁</tg-emoji>Введите @username получателя:"
+        f"Введите @username получателя:"
     )
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
@@ -386,13 +386,13 @@ async def back_to_stars_choice_callback(callback: CallbackQuery):
 
     text = (
         f"<tg-emoji emoji-id=\"5438391541288689158\">⭐️</tg-emoji><b>Telegram Stars</b>\n\n"
-        f"<tg-emoji emoji-id=\"5204330443725347173\">⭐️</tg-emoji><b>Вы выбрали:</b> {star_value} звёзд\n"
+        f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> {star_value} звёзд\n"
         f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Стоимость:</b> {formulastar}₽ \n\n"
         f"Для кого вы приобретаете:"
     )
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="💫Купить себе", callback_data="buy_stars_self")],
+        [InlineKeyboardButton(text="Купить себе", callback_data="buy_stars_self", icon_custom_emoji_id = 5406604187683270743)],
         [InlineKeyboardButton(text="Подарить другу", callback_data="gift_stars_friend", icon_custom_emoji_id=5203996991054432397)],
         [InlineKeyboardButton(text="Назад", callback_data="stars")]
     ])
@@ -457,7 +457,7 @@ async def process_friend_username(message: Message, state: FSMContext):
 
     text = (
         f"<tg-emoji emoji-id=\"5438391541288689158\">⭐️</tg-emoji><b>Telegram Stars</b>\n\n"
-        f"<tg-emoji emoji-id=\"5204330443725347173\">⭐️</tg-emoji><b>Вы выбрали:</b> {star_value} звёзд\n"
+        f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> {star_value} звёзд\n"
         f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Стоимость:</b> {formulastar}₽ \n"
         f"<tg-emoji emoji-id=\"5255975823436973213\">🎁</tg-emoji><b>Получатель:</b> {username}\n\n"
         f"Выберите способ оплаты:"
@@ -493,7 +493,7 @@ async def ton_cmd(message: Message, state: FSMContext):
         f"<tg-emoji emoji-id=\"5447644880824181073\">⚠️</tg-emoji>️<b>Примечание:</b> TON поступает не на кошелек, а на Telegram аккаунт по @username."
         f"Использовать TON можно <b>только</b> в качестве покупки подарков на Telegram маркете, "
         f"а так же для оплаты за посты в Telegram каналах!\n\n"
-        f"<tg-emoji emoji-id=\"5470060791883374114\">✍️</tg-emoji>Введите количество TON для покупки:\n"
+        f"Введите количество TON для покупки:\n"
         f"(Целое значение большее 1)"
     )
 
@@ -546,13 +546,13 @@ async def process_ton_amount(message: Message, state: FSMContext):
 
         text = (
             f"<tg-emoji emoji-id=\"5438332129006081114\">💎</tg-emoji><b>TON</b>\n\n"
-            f"<tg-emoji emoji-id=\"5204330443725347173\">⭐️</tg-emoji><b>Вы выбрали:</b> {ton_value} TON\n"
+            f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> {ton_value} TON\n"
             f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Стоимость:</b> {formulaTON} ₽\n\n"
             f"Для кого вы приобретаете?"
         )
 
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="💫Купить себе", callback_data="buy_ton_self")],
+            [InlineKeyboardButton(text="Купить себе", callback_data="buy_ton_self", icon_custom_emoji_id = 5406604187683270743)],
             [InlineKeyboardButton(text="Подарить другу", callback_data="gift_ton_friend", icon_custom_emoji_id=5203996991054432397)],
             [InlineKeyboardButton(text="Назад", callback_data="ton")]
         ])
@@ -594,7 +594,7 @@ async def ton_self_callback(callback: CallbackQuery):
 
     text = (
         f"<tg-emoji emoji-id=\"5438332129006081114\">💎</tg-emoji><b>TON</b>\n\n"
-        f"<tg-emoji emoji-id=\"5204330443725347173\">⭐️</tg-emoji><b>Вы выбрали:</b> {ton_value} TON\n"
+        f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> {ton_value} TON\n"
         f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Стоимость:</b> {formulaTON}₽\n"
         f"<tg-emoji emoji-id=\"5255975823436973213\">🎁</tg-emoji><b>Получатель</b>: {username}\n\n"
         f"Выберите способ оплаты:"
@@ -630,9 +630,9 @@ async def ton_friend_callback(callback: CallbackQuery, state: FSMContext):
 
     text = (
         f"<tg-emoji emoji-id=\"5438332129006081114\">💎</tg-emoji><b>TON</b>\n\n"
-        f"<tg-emoji emoji-id=\"5204330443725347173\">⭐️</tg-emoji><b>Вы выбрали:</b> {ton_value} TON\n"
+        f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> {ton_value} TON\n"
         f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Стоимость:</b> {formulaTON}₽\n\n"
-        f"<tg-emoji emoji-id=\"5470060791883374114\">✍️</tg-emoji>Введите @username получателя:"
+        f"Введите @username получателя:"
     )
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
@@ -686,7 +686,7 @@ async def process_ton_friend(message: Message, state: FSMContext):
 
     text = (
         f"<tg-emoji emoji-id=\"5438332129006081114\">💎</tg-emoji><b>TON</b>\n\n"
-        f"<tg-emoji emoji-id=\"5204330443725347173\">⭐️</tg-emoji><b>Вы выбрали:</b> {ton_value} TON\n"
+        f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> {ton_value} TON\n"
         f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Стоимость:</b> {formulaTON}₽\n"
         f"<tg-emoji emoji-id=\"5255975823436973213\">🎁</tg-emoji><b>Получатель</b>: @{username}\n\n"
         f"Выберите способ оплаты:"
@@ -759,7 +759,7 @@ async def premium_period_callback(callback: CallbackQuery, state: FSMContext):
     )
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="💫 Купить себе", callback_data="buy_premium_self")],
+        [InlineKeyboardButton(text="Купить себе", callback_data="buy_premium_self", icon_custom_emoji_id =5406604187683270743)],
         [InlineKeyboardButton(text="Подарить другу", callback_data="gift_premium_friend", icon_custom_emoji_id =5203996991054432397)],
         [InlineKeyboardButton(text="Назад", callback_data="menu")]
     ])
@@ -808,7 +808,7 @@ async def buy_premium_self_callback(callback: CallbackQuery):
         )
 
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="🎁 Подарить другу", callback_data="gift_premium_friend")],
+            [InlineKeyboardButton(text="Подарить другу", callback_data="gift_premium_friend", icon_custom_emoji_id = 5203996991054432397)],
             [InlineKeyboardButton(text="Назад", callback_data="premium")]
         ])
 
@@ -858,7 +858,7 @@ async def gift_premium_friend_callback(callback: CallbackQuery, state: FSMContex
         f"<tg-emoji emoji-id=\"5402352097045795954\">👑</tg-emoji><b>Telegram Premium</b>\n\n"
         f"<tg-emoji emoji-id=\"5274055917766202507\">🗓</tg-emoji><b>Срок:</b> {period}\n"
         f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Стоимость:</b> {priceprem}₽\n\n"
-        f"<tg-emoji emoji-id=\"5470060791883374114\">✍️</tg-emoji>Введите @username получателя:"
+        f"Введите @username получателя:"
     )
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
@@ -1180,6 +1180,7 @@ async def sbp_payment(callback: CallbackQuery):
         base_price = base_prices.get(period, amount)
         client_price = round(base_price / 0.92, 1)
         commission = round(client_price - base_price, 1)
+        amount = round(base_price / 0.92, 1)
 
     elif ptype == "ton" and ton_data:
         ton_value = ton_data.get('ton_value', '?')
@@ -1204,7 +1205,7 @@ async def sbp_payment(callback: CallbackQuery):
             f"<tg-emoji emoji-id=\"5363972466857252756\">🏦</tg-emoji><b>Оплата по СБП</b>\n\n"
             f"{description}\n"
             f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Сумма:</b> {round(amount,1)}₽ (комиссия {commission}₽)\n"
-            f"<tg-emoji emoji-id=\"5274099962655816924\">❗️</tg-emoji><b>Комиссия сервиса:</b> 8%\n\n"
+            f"<tg-emoji emoji-id=\"5274099962655816924\">❗️</tg-emoji><b>Комиссия:</b> 8%\n\n"
             f"👇 Нажмите кнопку для оплаты через СБП"
         )
         
