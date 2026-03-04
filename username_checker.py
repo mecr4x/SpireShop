@@ -141,6 +141,57 @@ async def check_invoice_status(invoice_id: str):
     except Exception as e:
         return {"success": False, "status": "error"}
 
+
+# ======= PLATEGA.IO ========
+async def create_platega_invoice(
+    amount_rub: float,
+    description: str = "",
+    order_id: str = "",
+    return_url: str = "https://t.me/spireshoptgbot"
+):
+    """
+    Создаёт платёж через Platega.io (СБП)
+    """
+    url = "https://app.platega.io/transaction/process"
+    
+    headers = {
+        "Content-Type": "application/json",
+        "X-MerchantId": "159cc4b3-df1c-4b9c-ba82-e73aaa52da33",  # 🔥 твой ID
+        "X-Secret": "ViiaxLVDICXaLOD17EsGTZlA2dR6MBA86BHjRCKVOLEjtJn9LcKDplxLr1WWsxfVmNuW7amrxGJMAXst7z7BSUf0qtNVsV9Xz8LH"  # 🔥 твой секретный ключ
+    }
+    
+    # Сумма с копейками (точка, не запятая)
+    amount_str = f"{amount_rub:.2f}"
+    
+    data = {
+        "paymentMethod": 2,  # 2 = СБП
+        "paymentDetails": {
+            "amount": float(amount_str),
+            "currency": "RUB"
+        },
+        "description": description[:255],
+        "return": return_url,
+        "failedUrl": return_url,
+        "payload": order_id or f"order_{int(time.time())}"
+    }
+    
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, json=data, headers=headers, timeout=10) as resp:
+                if resp.status == 200:
+                    result = await resp.json()
+                    if result.get("redirect"):
+                        return {
+                            "success": True,
+                            "transaction_id": result["transactionId"],
+                            "pay_url": result["redirect"],
+                            "status": result["status"],
+                            "expires": result["expiresIn"]
+                        }
+                return {"success": False, "error": f"HTTP {resp.status}"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
 # ===== ФУНКЦИЯ ДЛЯ ЗАКРЫТИЯ КЛИЕНТА =====
 async def close_client():
     """Закрывает клиент Telethon (вызывать при остановке бота)"""
