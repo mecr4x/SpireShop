@@ -17,6 +17,12 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.client.default import DefaultBotProperties
+from aiohttp import web
+import json
+import time
+
+# Хранилище обработанных транзакций (чтобы игнорировать дубликаты)
+processed_transactions = set()
 
 # ===== КОНФИГУРАЦИЯ =====
 BOT_TOKEN = "8236812443:AAGsoEmE7u9q5eBpKTQ3vlbp4IregP9-oHY"
@@ -314,8 +320,8 @@ async def buy_stars_self_callback(callback: CallbackQuery):
     )
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="СБП", callback_data=f"sbp_stars_{formulastar}", icon_custom_emoji_id =5305413839066525446)],
-        [InlineKeyboardButton(text="💎Cryptobot", callback_data=f"crypto_stars_{round (formulastar /0.97,1)}")],
+        [InlineKeyboardButton(text="СБП", callback_data=f"sbp_stars_{formulastar}", icon_custom_emoji_id =5363972466857252756)],
+        [InlineKeyboardButton(text="Cryptobot", callback_data=f"crypto_stars_{round (formulastar /0.97,1)}", icon_custom_emoji_id = 5361914370068613491)],
         [InlineKeyboardButton(text="❌Отмена", callback_data="back_to_stars_choice")]
     ])
 
@@ -455,8 +461,8 @@ async def process_friend_username(message: Message, state: FSMContext):
     )
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="СБП", callback_data=f"sbp_stars_friend_{formulastar}", icon_custom_emoji_id = 5305413839066525446)],
-        [InlineKeyboardButton(text="💎Cryptobot", callback_data=f"crypto_stars_friend_{round (formulastar /0.97,1)}")],
+        [InlineKeyboardButton(text="СБП", callback_data=f"sbp_stars_friend_{formulastar}", icon_custom_emoji_id = 5363972466857252756)],
+        [InlineKeyboardButton(text="Cryptobot", callback_data=f"crypto_stars_friend_{round (formulastar /0.97,1)}", icon_custom_emoji_id = 5361914370068613491")],
         [InlineKeyboardButton(text="❌Отмена", callback_data="back_to_stars_choice")]
     ])
 
@@ -480,7 +486,7 @@ async def ton_cmd(message: Message, state: FSMContext):
 
     text = (
         f"<tg-emoji emoji-id=\"5438332129006081114\">💎</tg-emoji><b>TON</b>\n\n"
-        f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Курс к рублю:</b> {TON_RUB + 30}₽\n"
+        f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Курс к рублю:</b> {round(TON_RUB + 30),1}₽\n"
         f"<tg-emoji emoji-id=\"5447644880824181073\">⚠️</tg-emoji>️<b>Примечание:</b> TON поступает не на кошелек, а на Telegram аккаунт по @username."
         f"Использовать TON можно <b>только</b> в качестве покупки подарков на Telegram маркете, "
         f"а так же для оплаты за посты в Telegram каналах!\n\n"
@@ -592,8 +598,8 @@ async def ton_self_callback(callback: CallbackQuery):
     )
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="СБП", callback_data=f"sbp_ton_{formulaTON}", icon_custom_emoji_id =5305413839066525446)],
-        [InlineKeyboardButton(text="💎CryptoBot", callback_data=f"crypto_ton_{formulaTON}")],
+        [InlineKeyboardButton(text="СБП", callback_data=f"sbp_ton_{formulaTON}", icon_custom_emoji_id =5363972466857252756)],
+        [InlineKeyboardButton(text="CryptoBot", callback_data=f"crypto_ton_{formulaTON}",  icon_custom_emoji_id = 5361914370068613491)],
         [InlineKeyboardButton(text="❌Отмена", callback_data="ton")]
     ])
 
@@ -684,8 +690,8 @@ async def process_ton_friend(message: Message, state: FSMContext):
     )
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="СБП", callback_data=f"sbp_ton_{formulaTON}", icon_custom_emoji_id =5305413839066525446)],
-        [InlineKeyboardButton(text="🔐CryptoBot", callback_data=f"crypto_ton_{formulaTON}")],
+        [InlineKeyboardButton(text="СБП", callback_data=f"sbp_ton_{formulaTON}", icon_custom_emoji_id =5363972466857252756)],
+        [InlineKeyboardButton(text="CryptoBot", callback_data=f"crypto_ton_{formulaTON}",  icon_custom_emoji_id = 5361914370068613491)],
         [InlineKeyboardButton(text="❌Отмена", callback_data="ton")]
     ])
 
@@ -819,8 +825,8 @@ async def buy_premium_self_callback(callback: CallbackQuery):
         )
 
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="СБП", callback_data=f"sbp_premium_{priceprem}",icon_custom_emoji_id = 5305413839066525446)],
-            [InlineKeyboardButton(text="💎Cryptobot", callback_data=f"crypto_premium_{round(priceprem /0.97,1)}")],
+            [InlineKeyboardButton(text="СБП", callback_data=f"sbp_premium_{priceprem}",icon_custom_emoji_id =5363972466857252756)],
+            [InlineKeyboardButton(text="Cryptobot", callback_data=f"crypto_premium_{round(priceprem /0.97,1)}",  icon_custom_emoji_id = 5361914370068613491)],
             [InlineKeyboardButton(text="❌Отмена", callback_data="premium")]
         ])
 
@@ -943,8 +949,8 @@ async def process_premium_friend(message: Message, state: FSMContext):
         )
 
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="СБП", callback_data=f"sbp_premium_{priceprem}", icon_custom_emoji_id = 5305413839066525446)],
-            [InlineKeyboardButton(text="💎Cryptobot", callback_data=f"crypto_premium_{round(priceprem /0.97,1)}")],
+            [InlineKeyboardButton(text="СБП", callback_data=f"sbp_premium_{priceprem}", icon_custom_emoji_id = 5363972466857252756)],
+            [InlineKeyboardButton(text="Cryptobot", callback_data=f"crypto_premium_{round(priceprem /0.97,1)}",  icon_custom_emoji_id = 5361914370068613491)],
             [InlineKeyboardButton(text="❌ Отмена", callback_data="premium")]
         ])
 
@@ -1046,7 +1052,7 @@ async def crypto_payment(callback: CallbackQuery):
 
         # Отправляем ссылку
         text = (
-            f"<tg-emoji emoji-id=\"5199552030615558774\">🪙</tg-emoji><b>CryptoBot</b>\n\n"
+            f"<tg-emoji emoji-id=\"5361914370068613491\">👛</tg-emoji><b>CryptoBot</b>\n\n"
             f"{description}\n"
             f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Сумма:</b> {round(amount,1)}₽ (комиссия {commission}₽)\n"
             f"<tg-emoji emoji-id=\"5274099962655816924\">❗️</tg-emoji><b>Комиссия:</b>3%\n\n"
@@ -1054,7 +1060,7 @@ async def crypto_payment(callback: CallbackQuery):
         )
 
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text=f"💳Оплатить", url=result["pay_url"])],
+            [InlineKeyboardButton(text=f"Оплатить", url=result["pay_url"])],
             [InlineKeyboardButton(text="❌Отмена", callback_data=ptype)]
         ])
 
@@ -1079,7 +1085,7 @@ async def crypto_payment(callback: CallbackQuery):
         # Ошибка
         error_text = f"❌ Ошибка: {result.get('error', 'Неизвестная ошибка')}"
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="🔙 Назад", callback_data=ptype)]
+            [InlineKeyboardButton(text=" Назад", callback_data=ptype)]
         ])
         sent = await callback.message.answer(error_text, reply_markup=keyboard)
         await save_and_delete_previous(user_id, sent.message_id)
@@ -1141,11 +1147,44 @@ async def sbp_payment(callback: CallbackQuery):
         await callback.answer("❌ Ошибка", show_alert=True)
         return
     
+    # 👇 ПОЛУЧАЕМ ДАННЫЕ ИЗ ХРАНИЛИЩА
+    stars_data = get_user_data(user_id, "stars")
+    premium_data = get_user_data(user_id, "premium")
+    ton_data = get_user_data(user_id, "ton_purchase")
+    
+    # 👇 ГЛОБАЛЬНАЯ ПЕРЕМЕННАЯ КУРСА TON
+    global TON_RUB
+    
     wait_msg = await callback.message.answer("🔄 Создаю ссылку для оплаты...")
     
     from username_checker import create_platega_invoice
     
-    description = f"{ptype.upper()} {amount}₽"
+    # Определяем описание и комиссию
+    if ptype == "stars" and stars_data:
+        star_value = stars_data.get('star_value', '?')
+        description = f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> {star_value} звёзд"
+        base_price = round(star_value * 1.7, 1)  # твой доход
+        amount = round(base_price / 0.92, 1)
+
+    elif ptype == "premium" and premium_data:
+        period = premium_data.get('period', 'Premium')
+        description = f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> Telegram Premium на {period}"
+        base_prices = {"12 месяцев": 3000, "6 месяцев": 1700, "3 месяца": 1300}
+        base_price = base_prices.get(period, amount)
+        client_price = round(base_price / 0.92, 1)
+        commission = round(client_price - base_price, 1)
+
+    elif ptype == "ton" and ton_data:
+        ton_value = ton_data.get('ton_value', '?')
+        description = f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> {ton_value} TON"
+        base_price = round(ton_value * TON_RUB, 1)  # твой доход
+        amount = round(base_price / 0.92, 1) 
+    
+    else:
+        description = f"Оплата {amount}₽"
+        commission = 0
+
+    payload = f"{ptype}_{user_id}_{int(time.time())}"
     order_id = f"{ptype}_{user_id}_{int(time.time())}"
     
     result = await create_platega_invoice(
@@ -1157,10 +1196,15 @@ async def sbp_payment(callback: CallbackQuery):
     await delete_user_message(user_id, wait_msg.message_id)
     
     if result["success"]:
+        # Формируем текст с комиссией
+        if commission > 0:
+            commission_text = f"💰 <b>Сумма:</b> {round(amount,1)}₽ (комиссия {commission}₽)"
+        
         text = (
-            f"🏦<b>Оплата по СБП</b>\n\n"
-            f"💰 Сумма: <b>{amount}₽</b>\n"
-            f"📝 {description}\n\n"
+            f"<tg-emoji emoji-id=\"5363972466857252756\">🏦</tg-emoji><b>Оплата по СБП</b>\n\n"
+            f"{description}\n"
+            f"{commission_text}\n"
+            f"<tg-emoji emoji-id=\"5274099962655816924\">❗️</tg-emoji><b>Комиссия сервиса:</b> 8%\n\n"
             f"👇 Нажмите кнопку для оплаты через СБП"
         )
         
@@ -1176,8 +1220,65 @@ async def sbp_payment(callback: CallbackQuery):
     
     await callback.answer()
 
+# ===== WEBHOOK ДЛЯ PLATEGA =====
+async def platega_webhook(request):
+    """Принимает уведомления от Platega"""
+    try:
+        data = await request.json()
+        print(f"📩 Platega webhook: {data}")
+        
+        transaction_id = data.get('transactionId')
+        
+        # Игнорируем дубликаты
+        if transaction_id in processed_transactions:
+            return web.Response(text="OK", status=200)
+        
+        processed_transactions.add(transaction_id)
+        
+        # Очистка старых записей (раз в час)
+        if len(processed_transactions) > 1000:
+            processed_transactions.clear()
+        
+        # Проверяем статус платежа
+        if data.get('status') == 'SUCCESS':
+            payload = data.get('payload', '')
+            
+            # Извлекаем user_id из payload (формат: тип_userId_время)
+            if payload:
+                parts = payload.split('_')
+                if len(parts) >= 2:
+                    user_id = int(parts[1])
+                    ptype = parts[0]
+                    
+                    # Уведомляем пользователя
+                    await bot.send_message(
+                        user_id,
+                        f"✅ Оплата через СБП подтверждена!\nСпасибо за покупку!"
+                    )
+                    
+                    print(f"✅ Платёж подтверждён для user {user_id}, тип {ptype}")
+        
+        return web.Response(text="OK", status=200)
+        
+    except Exception as e:
+        print(f"❌ Ошибка webhook: {e}")
+        return web.Response(text="Error", status=500)
+
+# ===== ЗАПУСК WEB-СЕРВЕРА =====
+async def start_web_server():
+    app = web.Application()
+    app.router.add_post('/webhook/platega', platega_webhook)
+    
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, '0.0.0.0', 8080)
+    await site.start()
+    print("✅ Webhook сервер запущен на порту 8080")
+
 # ===== ЗАПУСК =====
 async def main():
+     # Запускаем webhook сервер
+    asyncio.create_task(start_web_server())
     # Подключаем Telethon при запуске бота
     from username_checker import ensure_client
     await ensure_client()
