@@ -1155,7 +1155,7 @@ async def sbp_payment(callback: CallbackQuery):
     # 👇 ГЛОБАЛЬНАЯ ПЕРЕМЕННАЯ КУРСА TON
     global TON_RUB
     
-    wait_msg = await callback.message.answer("🔄 Создаю ссылку для оплаты...")
+    wait_msg = await callback.message.answer("Создаю ссылку для оплаты...")
     
     from username_checker import create_platega_invoice
     
@@ -1180,10 +1180,6 @@ async def sbp_payment(callback: CallbackQuery):
         base_price = round(ton_value * TON_RUB, 1)  # твой доход
         amount = round(base_price / 0.92, 1) 
     
-    else:
-        description = f"Оплата {amount}₽"
-        commission = 0
-
     payload = f"{ptype}_{user_id}_{int(time.time())}"
     order_id = f"{ptype}_{user_id}_{int(time.time())}"
     
@@ -1196,14 +1192,11 @@ async def sbp_payment(callback: CallbackQuery):
     await delete_user_message(user_id, wait_msg.message_id)
     
     if result["success"]:
-        # Формируем текст с комиссией
-        if commission > 0:
-            commission_text = f"💰 <b>Сумма:</b> {round(amount,1)}₽ (комиссия {commission}₽)"
         
         text = (
             f"<tg-emoji emoji-id=\"5363972466857252756\">🏦</tg-emoji><b>Оплата по СБП</b>\n\n"
             f"{description}\n"
-            f"{commission_text}\n"
+            f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Сумма:</b> {round(amount,1)}₽ (комиссия {commission}₽)\n"
             f"<tg-emoji emoji-id=\"5274099962655816924\">❗️</tg-emoji><b>Комиссия сервиса:</b> 8%\n\n"
             f"👇 Нажмите кнопку для оплаты через СБП"
         )
