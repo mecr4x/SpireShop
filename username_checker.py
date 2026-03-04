@@ -22,6 +22,10 @@ async def check_username(username: str) -> dict:
     """
     Подключается к Telethon ТОЛЬКО для проверки, потом отключается
     """
+    # Для совместимости со старым кодом
+async def ensure_client():
+    """Заглушка для обратной совместимости"""
+    return True
     clean_username = username.strip().replace('@', '')
     if not clean_username:
         return {'exists': False, 'error': '❌ Пустой username'}
