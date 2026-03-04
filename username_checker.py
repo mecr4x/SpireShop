@@ -27,10 +27,18 @@ username_cache = {}
 CACHE_TIME = 300
 
 # ===== TELETHON КЛИЕНТ (ОДИН РАЗ) =====
-client = TelegramClient(StringSession(STRING_SESSION), API_ID, API_HASH)
+from telethon import TelegramClient
+from telethon.sessions import StringSession
 
+client = TelegramClient(
+    StringSession(STRING_SESSION), 
+    API_ID, 
+    API_HASH,
+    update_queue_limit=1,  # 👈 ограничиваем обновления
+    auto_reconnect=False    # 👈 отключаем авто-переподключение
+)
 async def ensure_client():
-    """Просто подключаем клиент если нужно"""
+    """Только проверяет подключение, не запускает обновления"""
     if not client.is_connected():
         await client.connect()
     return True
