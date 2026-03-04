@@ -1138,6 +1138,54 @@ async def check_invoice_status(invoice_id: str):
                 return {"status": data["result"]["items"][0]["status"]}
     return {"status": "unknown"}
 
+# ====== SBP =======
+@router.callback_query(F.data.startswith("sbp_"))
+async def sbp_payment(callback: CallbackQuery):
+    user_id = callback.from_user.id
+    parts = callback.data.split("_")
+    
+    if len(parts) >= 3:
+        ptype = parts[1]
+        amount = float(parts[2])
+    else:
+        await callback.answer("❌ Ошибка", show_alert=True)
+        return
+    
+    wait_msg = await callback.message.answer("🔄 Создаю ссылку для оплаты...")
+    
+    from username_checker import create_platega_invoice
+    
+    description = f"{ptype.upper()} {amount}₽"
+    order_id = f"{ptype}_{user_id}_{int(time.time())}"
+    
+    result = await create_platega_invoice(
+        amount_rub=amount,
+        description=description,
+        order_id=order_id
+    )
+    
+    await delete_user_message(user_id, wait_msg.message_id)
+    
+    if result["success"]:
+        text = (
+            f"🏦<b>Оплата по СБП</b>\n\n"
+            f"💰 Сумма: <b>{amount}₽</b>\n"
+            f"📝 {description}\n\n"
+            f"👇 Нажмите кнопку для оплаты через СБП"
+        )
+        
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="Оплатить", url=result["pay_url"])],
+            [InlineKeyboardButton(text="❌Отмена", callback_data=ptype)]
+        ])
+        
+        sent = await callback.message.answer(text, reply_markup=keyboard, parse_mode="HTML")
+        await save_and_delete_previous(user_id, sent.message_id)
+    else:
+        await callback.message.answer(f"❌ Ошибка: {result.get('error')}")
+    
+    await callback.answer()
+
 # ===== ЗАПУСК =====
 async def main():
     # Подключаем Telethon при запуске бота
