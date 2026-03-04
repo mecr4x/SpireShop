@@ -462,7 +462,7 @@ async def process_friend_username(message: Message, state: FSMContext):
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="СБП", callback_data=f"sbp_stars_friend_{formulastar}", icon_custom_emoji_id = 5363972466857252756)],
-        [InlineKeyboardButton(text="Cryptobot", callback_data=f"crypto_stars_friend_{round (formulastar /0.97,1)}", icon_custom_emoji_id = 5361914370068613491")],
+        [InlineKeyboardButton(text="Cryptobot", callback_data=f"crypto_stars_friend_{round (formulastar /0.97,1)}", icon_custom_emoji_id = 5361914370068613491)],
         [InlineKeyboardButton(text="❌Отмена", callback_data="back_to_stars_choice")]
     ])
 
