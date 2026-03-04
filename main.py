@@ -179,16 +179,15 @@ async def info_callback(callback: CallbackQuery, state: FSMContext):
         [InlineKeyboardButton(text="Пользовательское соглашение", url="https://telegra.ph/Polzovatelskoe-soglashenie-03-03-16", icon_custom_emoji_id=6021741567163767583)],
         [InlineKeyboardButton(text=" Назад", callback_data="back_to_menu")],
     ])
-        # Если не получается отредактировать, отправляем новое
-        try:
-            photo = FSInputFile("images/info.jpg")
-            sent_message = await callback.message.answer_photo(photo=photo, caption=text, reply_markup=keyboard)
-        except:
-            sent_message = await callback.message.answer(text, reply_markup=keyboard)
-        
-        await save_and_delete_previous(callback.from_user.id, sent_message.message_id)
+           # Отправляем сообщение
+    try:
+        photo = FSInputFile("images/info.jpg")
+        sent_message = await callback.message.answer_photo(photo=photo, caption=text, reply_markup=keyboard)
+    except:
+        sent_message = await callback.message.answer(text, reply_markup=keyboard)
     
-    await callback.answer()  # Отвечаем на callback, чтобы убрать "часики" на кнопке
+    await save_and_delete_previous(callback.from_user.id, sent_message.message_id)
+    await callback.answer()
 
 
 # ===== КОМАНДА /STARS =====
