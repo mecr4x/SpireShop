@@ -1,13 +1,21 @@
 # username_checker.py
 from telethon import TelegramClient
 from telethon.sessions import StringSession
+from telethon.errors import UsernameInvalidError, FloodWaitError
 import aiohttp
 import asyncio
 import time
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # ===== ТВОИ ДАННЫЕ =====
 API_ID = 31990778
 API_HASH = "6d72f5bffdabc0a648943c49c4d95fd3"
+PHONE = "+79094717005"
+
+# ===== СТРОКА СЕССИИ =====
 STRING_SESSION = "1ApWapzMBu2nJAkIdDGcUQi2N7ToNOaX_q735Lew6U_WxU5FmlD-flNGsAl29jOK81AnawXdC4mEBlSJFEloW0SHGVb5X6oX19iupFfSjE5Ih5Z_hiniiTXQJNXs1cNpjoUvNw5K2XqoiOHPVjZappyJT3HbQ_MveWzd0llJ_v2Uyj_7OGMMpMdgCJASSQRLuwMm7SmoYS42L61-F8g0jB4UCIo_6MW9P_meZXx5_XARRRRFW-gblOQ0k6YFG96eK_WAsVZwjYuDnNm3sA-qwuXuI2gTX4T2UcFWVDiBp25E0Q-DRZETO_GadWafaLVOMtIvt5mn18G0UyqOf7Zwo_MZY5aLGyC8="
 
 # ===== CRYPTOBOT =====
@@ -18,49 +26,53 @@ BOT_USERNAME = "spireshoptgbot"
 username_cache = {}
 CACHE_TIME = 300
 
-async def check_username(username: str) -> dict:
-    """
-    Подключается к Telethon ТОЛЬКО для проверки, потом отключается
-    """
-    # Для совместимости со старым кодом
+# ===== TELETHON КЛИЕНТ (ОДИН НА ВЕСЬ БОТ) =====
+client = TelegramClient(StringSession(STRING_SESSION), API_ID, API_HASH)
+client_ready = False
+
 async def ensure_client():
-    """Заглушка для обратной совместимости"""
-    return True
+    """Подключает клиента если нужно"""
+    global client_ready
+    if not client_ready:
+        try:
+            await client.connect()
+            # Не вызываем get_me() — это создаёт лишние обновления
+            client_ready = True
+            print("✅ Telethon подключён")
+        except Exception as e:
+            print(f"❌ Ошибка Telethon: {e}")
+            client_ready = False
+    return client_ready
+
+async def check_username(username: str) -> dict:
     clean_username = username.strip().replace('@', '')
     if not clean_username:
         return {'exists': False, 'error': '❌ Пустой username'}
 
-    # Проверяем кэш
+    # Кэш
     if clean_username in username_cache:
         data, timestamp = username_cache[clean_username]
         if time.time() - timestamp < CACHE_TIME:
             return data
 
     try:
-        # СОЗДАЁМ КЛИЕНТА ТОЛЬКО ДЛЯ ЭТОГО ЗАПРОСА
-        client = TelegramClient(StringSession(STRING_SESSION), API_ID, API_HASH)
-        await client.connect()
-        
+        await ensure_client()
         user = await client.get_entity(clean_username)
-        
+
         result = {
             'exists': True,
             'user_id': user.id,
             'username': user.username,
             'premium': getattr(user, 'premium', False)
         }
-        
-        await client.disconnect()  # 👈 ОТКЛЮЧАЕМСЯ СРАЗУ
+
         username_cache[clean_username] = (result, time.time())
         return result
 
+    except UsernameInvalidError:
+        return {'exists': False, 'error': '❌ Пользователь не найден'}
     except Exception:
         return {'exists': False, 'error': '❌ Пользователь не найден'}
-    finally:
-        try:
-            await client.disconnect()
-        except:
-            pass
 
 # ===== CRYPTOBOT ФУНКЦИИ =====
 async def create_crypto_invoice(amount_rub: float, description: str = "", payload: str = ""):
