@@ -379,7 +379,10 @@ async def back_to_stars_choice_callback(callback: CallbackQuery):
 
     star_value = stars_data['star_value']
     formulastar = stars_data['formulastar']
-    star_ton = stars_data['star_ton']
+    # Стало (в зависимости от того, как сохраняешь)
+    star_ton = stars_data['formulaTON']
+    # или
+    star_ton = stars_data['price_ton']
 
     text = (
         f"<tg-emoji emoji-id=\"5438391541288689158\">⭐️</tg-emoji><b>Telegram Stars</b>\n\n"
