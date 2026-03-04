@@ -1157,6 +1157,10 @@ async def sbp_payment(callback: CallbackQuery):
     
     # 👇 ГЛОБАЛЬНАЯ ПЕРЕМЕННАЯ КУРСА TON
     global TON_RUB
+
+     # 👇 ЗАДАЁМ НАЧАЛЬНЫЕ ЗНАЧЕНИЯ
+    commission = 0
+    description = f"Оплата {amount}₽"
     
     wait_msg = await callback.message.answer("Создаю ссылку для оплаты...")
     
