@@ -179,14 +179,6 @@ async def info_callback(callback: CallbackQuery, state: FSMContext):
         [InlineKeyboardButton(text="Пользовательское соглашение", url="https://telegra.ph/Polzovatelskoe-soglashenie-03-03-16", icon_custom_emoji_id=6021741567163767583)],
         [InlineKeyboardButton(text=" Назад", callback_data="back_to_menu")],
     ])
-    
-    try:
-        # Редактируем существующее сообщение вместо отправки нового
-        if callback.message.photo:
-            await callback.message.edit_caption(caption=text, reply_markup=keyboard)
-        else:
-            await callback.message.edit_text(text, reply_markup=keyboard)
-    except:
         # Если не получается отредактировать, отправляем новое
         try:
             photo = FSInputFile("images/info.jpg")
