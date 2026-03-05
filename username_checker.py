@@ -1,60 +1,71 @@
 # username_checker.py
 from telethon import TelegramClient
 from telethon.sessions import StringSession
-from telethon.errors import UsernameInvalidError, FloodWaitError
+from telethon.errors import UsernameInvalidError, FloodWaitError, SessionPasswordNeededError
 import aiohttp
 import asyncio
 import time
 import os
 from dotenv import load_dotenv
 
+# Загружаем переменные окружения из .env файла (если есть)
 load_dotenv()
 
-# ===== ТВОИ ДАННЫЕ =====
-API_ID = 31990778
-API_HASH = "6d72f5bffdabc0a648943c49c4d95fd3"
-PHONE = "+79094717005"
+# ===== ТВОИ ДАННЫЕ (ЗАПОЛНИ ОБЯЗАТЕЛЬНО) =====
+API_ID = 31990778  # 🔥 ТВОЙ API ID (число)
+API_HASH = "6d72f5bffdabc0a648943c49c4d95fd3"  # 🔥 ТВОЙ API HASH
+PHONE = "+79094717005"  # 🔥 ТВОЙ НОМЕР ТЕЛЕФОНА
+PASSWORD = "Serzh011"  # 🔥 ПАРОЛЬ 2FA (если есть)
 
-# ===== СТРОКА СЕССИИ =====
+# ===== СТРОКА СЕССИИ (полученная из генератора) =====
 STRING_SESSION = "1ApWapzMBu2nJAkIdDGcUQi2N7ToNOaX_q735Lew6U_WxU5FmlD-flNGsAl29jOK81AnawXdC4mEBlSJFEloW0SHGVb5X6oX19iupFfSjE5Ih5Z_hiniiTXQJNXs1cNpjoUvNw5K2XqoiOHPVjZappyJT3HbQ_MveWzd0llJ_v2Uyj_7OGMMpMdgCJASSQRLuwMm7SmoYS42L61-F8g0jB4UCIo_6MW9P_meZXx5_XARRRRFW-gblOQ0k6YFG96eK_WAsVZwjYuDnNm3sA-qwuXuI2gTX4T2UcFWVDiBp25E0Q-DRZETO_GadWafaLVOMtIvt5mn18G0UyqOf7Zwo_MZY5aLGyC8="
 
-# ===== CRYPTOBOT =====
+# ===== CRYPTOBOT НАСТРОЙКИ =====
 CRYPTO_TOKEN = "513952:AA8SvhV7y2TSGXIsQ1Sjmu1jc6CZPxDAgJZ"
 BOT_USERNAME = "spireshoptgbot"
 
-# ===== КЭШ =====
+# ===== КЭШ ДЛЯ USERNAME =====
 username_cache = {}
-CACHE_TIME = 300
+CACHE_TIME = 300  # 5 минут
 
-# ===== TELETHON КЛИЕНТ (ОДИН НА ВЕСЬ БОТ) =====
+# ===== TELETHON КЛИЕНТ =====
 client = TelegramClient(StringSession(STRING_SESSION), API_ID, API_HASH)
 client_ready = False
 
 async def ensure_client():
-    """Подключает клиента если нужно"""
+    """Подключает клиента Telethon если ещё не подключен"""
     global client_ready
     if not client_ready:
         try:
+            print("🔄 Подключение к Telethon...")
             await client.connect()
-            # Не вызываем get_me() — это создаёт лишние обновления
+            
+            if not await client.is_user_authorized():
+                # Если сессия не работает - пробуем заново
+                await client.start(phone=PHONE, password=PASSWORD)
+            
             client_ready = True
-            print("✅ Telethon подключён")
+            me = await client.get_me()
+            print(f"✅ Telethon готов! Аккаунт: @{me.username}")
         except Exception as e:
-            print(f"❌ Ошибка Telethon: {e}")
+            print(f"❌ Ошибка подключения Telethon: {e}")
             client_ready = False
     return client_ready
 
 async def check_username(username: str) -> dict:
+    """Проверяет существование username в Telegram"""
     clean_username = username.strip().replace('@', '')
     if not clean_username:
         return {'exists': False, 'error': '❌ Пустой username'}
 
-    # Кэш
+    # Проверяем кэш
     if clean_username in username_cache:
         data, timestamp = username_cache[clean_username]
         if time.time() - timestamp < CACHE_TIME:
+            print(f"📦 Кэш: @{clean_username}")
             return data
 
+    print(f"🔍 Проверка: @{clean_username}")
     try:
         await ensure_client()
         user = await client.get_entity(clean_username)
@@ -63,7 +74,11 @@ async def check_username(username: str) -> dict:
             'exists': True,
             'user_id': user.id,
             'username': user.username,
-            'premium': getattr(user, 'premium', False)
+            'first_name': getattr(user, 'first_name', ''),
+            'last_name': getattr(user, 'last_name', ''),
+            'premium': getattr(user, 'premium', False),
+            'bot': user.bot if hasattr(user, 'bot') else False,
+            'verified': getattr(user, 'verified', False)
         }
 
         username_cache[clean_username] = (result, time.time())
@@ -71,8 +86,11 @@ async def check_username(username: str) -> dict:
 
     except UsernameInvalidError:
         return {'exists': False, 'error': '❌ Пользователь не найден'}
+    except FloodWaitError as e:
+        return {'exists': False, 'error': f'❌ Слишком много запросов, подождите {e.seconds}с'}
     except Exception:
         return {'exists': False, 'error': '❌ Пользователь не найден'}
+
 
 # ===== CRYPTOBOT ФУНКЦИИ =====
 async def create_crypto_invoice(amount_rub: float, description: str = "", payload: str = ""):
