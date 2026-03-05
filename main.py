@@ -202,8 +202,8 @@ async def stars_cmd(message: Message, state: FSMContext):
 
     text = (
         "<tg-emoji emoji-id=\"5438391541288689158\">⭐️</tg-emoji><b>Telegram Stars</b>\n\n"
-        "Минимальное количество: 50\n"
-        "Максимальное количество: 1,000,000\n\n"
+        "<b>Минимальное количество:</b> 50\n"
+        "<b>Максимальное количество:</b> 1,000,000\n\n"
         "Введите количество звёзд для покупки:"
     )
 
@@ -379,10 +379,7 @@ async def back_to_stars_choice_callback(callback: CallbackQuery):
 
     star_value = stars_data['star_value']
     formulastar = stars_data['formulastar']
-    # Стало (в зависимости от того, как сохраняешь)
     star_ton = stars_data['formulaTON']
-    # или
-    star_ton = stars_data['price_ton']
 
     text = (
         f"<tg-emoji emoji-id=\"5438391541288689158\">⭐️</tg-emoji><b>Telegram Stars</b>\n\n"
@@ -622,7 +619,7 @@ async def ton_friend_callback(callback: CallbackQuery, state: FSMContext):
     data = get_user_data(user_id, "ton_purchase")
 
     if not data:
-        await callback.answer("❌ Сначала выберите сумму", show_alert=True)
+        await callback.answer("❌Сначала выберите сумму", show_alert=True)
         return
 
     ton_value = data['ton_value']
@@ -954,7 +951,7 @@ async def process_premium_friend(message: Message, state: FSMContext):
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="СБП", callback_data=f"sbp_premium_{priceprem}", icon_custom_emoji_id = 5363972466857252756)],
             [InlineKeyboardButton(text="Cryptobot", callback_data=f"crypto_premium_{round(priceprem /0.97,1)}",  icon_custom_emoji_id = 5361914370068613491)],
-            [InlineKeyboardButton(text="❌ Отмена", callback_data="premium")]
+            [InlineKeyboardButton(text="❌Отмена", callback_data="premium")]
         ])
 
         try:
@@ -1086,7 +1083,7 @@ async def crypto_payment(callback: CallbackQuery):
         await save_and_delete_previous(user_id, sent.message_id)
     else:
         # Ошибка
-        error_text = f"❌ Ошибка: {result.get('error', 'Неизвестная ошибка')}"
+        error_text = f"❌Ошибка: {result.get('error', 'Неизвестная ошибка')}"
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text=" Назад", callback_data=ptype)]
         ])
@@ -1179,7 +1176,6 @@ async def sbp_payment(callback: CallbackQuery):
         base_prices = {"12 месяцев": 3000, "6 месяцев": 1700, "3 месяца": 1300}
         base_price = base_prices.get(period, amount)
         client_price = round(base_price / 0.92, 1)
-        commission = round(client_price - base_price, 1)
         amount = round(base_price / 0.92, 1)
 
     elif ptype == "ton" and ton_data:
@@ -1204,9 +1200,9 @@ async def sbp_payment(callback: CallbackQuery):
         text = (
             f"<tg-emoji emoji-id=\"5363972466857252756\">🏦</tg-emoji><b>Оплата по СБП</b>\n\n"
             f"{description}\n"
-            f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Сумма:</b> {round(amount,1)}₽ (комиссия {commission}₽)\n"
+            f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Сумма:</b> {round(amount,1)}₽ (комиссия {amount - base_price}₽)\n"
             f"<tg-emoji emoji-id=\"5274099962655816924\">❗️</tg-emoji><b>Комиссия:</b> 8%\n\n"
-            f"👇 Нажмите кнопку для оплаты через СБП"
+            f"👇Нажмите кнопку для оплаты"
         )
         
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
