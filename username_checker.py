@@ -171,7 +171,7 @@ async def check_invoice_status(invoice_id: str):
 # ======= PLATEGA.IO ========
 async def create_platega_invoice(
     amount_rub: float,
-    description: Спасибо за покупку! Ждем вас снова в SpireShop),
+    description: "Спасибо за покупку! Ждем вас снова в SpireShop)",
     order_id: str = "",
     return_url: str = "https://t.me/spireshoptgbot"
 ):
