@@ -1140,9 +1140,10 @@ async def sbp_payment(callback: CallbackQuery):
     user_id = callback.from_user.id
     parts = callback.data.split("_")
     
-    if len(parts) >= 3:
-        ptype = parts[1]
-        amount = float(parts[2])
+    if len(parts) >= 4:  # формат: sbp_тип_получатель_сумма
+        ptype = parts[1]        # stars, premium, ton
+        recipient = parts[2]     # self или friend
+        amount = float(parts[3]) # сумма
     else:
         await callback.answer("❌ Ошибка", show_alert=True)
         return
