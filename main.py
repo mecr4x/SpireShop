@@ -17,7 +17,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.client.default import DefaultBotProperties
-from aiohttp import web
+#from aiohttp import web
 import json
 import time
 
@@ -1226,7 +1226,7 @@ async def sbp_payment(callback: CallbackQuery):
     await callback.answer()
 
 # ===== WEBHOOK ДЛЯ PLATEGA =====
-async def platega_webhook(request):
+#async def platega_webhook(request):
     """Принимает уведомления от Platega"""
     try:
         data = await request.json()
@@ -1287,22 +1287,6 @@ async def platega_webhook(request):
 
 
 # ===== ЗАПУСК =====
-async def on_startup():
-    """Действия при запуске"""
-    # Устанавливаем вебхук
-    webhook_url = "https://01kjwz01sk1rp562fdxzfjfw5v.hooks.webhookrelay.com/webhook/platega"
-    await bot.set_webhook(
-        url=webhook_url,
-        allowed_updates=["message", "callback_query"],
-        secret_token="SpireWebhookSecret2025"  # или убери если не нужно
-    )
-    print(f"✅ Вебхук установлен: {webhook_url}")
-
-async def on_shutdown():
-    """Действия при остановке"""
-    await bot.delete_webhook()
-    await bot.session.close()
-    print("👋 Вебхук удалён")
 
 async def main():
     # Подключаем Telethon
@@ -1333,27 +1317,6 @@ async def main():
         print("=" * 50)
         print("⏳ Ожидаю сообщений через вебхук...")
         print("=" * 50)
-
-        # Устанавливаем вебхук
-        await on_startup()
-
-        # Запускаем веб-сервер для приёма вебхуков
-        app = web.Application()
-        app.router.add_post('/webhook/platega', platega_webhook)
-        
-        runner = web.AppRunner(app)
-        await runner.setup()
-        site = web.TCPSite(runner, '0.0.0.0', 8080)
-        await site.start()
-        print("✅ Webhook сервер запущен на порту 8080")
-
-        # Держим бота запущенным
-        await asyncio.Event().wait()
-
-    except Exception as e:
-        print(f"❌ Ошибка запуска: {e}")
-    finally:
-        await on_shutdown()
 
 if __name__ == "__main__":
     asyncio.run(main())
