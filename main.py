@@ -1286,25 +1286,31 @@ async def platega_webhook(request):
 
 
 # ===== ЗАПУСК =====
+async def on_startup():
+    """Действия при запуске"""
+    # Устанавливаем вебхук
+    webhook_url = "https://01kjwz01sk1rp562fdxzfjfw5v.hooks.webhookrelay.com/webhook/platega"
+    await bot.set_webhook(
+        url=webhook_url,
+        allowed_updates=["message", "callback_query"],
+        secret_token="SpireWebhookSecret2025"  # или убери если не нужно
+    )
+    print(f"✅ Вебхук установлен: {webhook_url}")
+
+async def on_shutdown():
+    """Действия при остановке"""
+    await bot.delete_webhook()
+    await bot.session.close()
+    print("👋 Вебхук удалён")
+
 async def main():
-    # Принудительно удаляем вебхук при каждом запуске
-    try:
-        await bot.delete_webhook()
-        print("✅ Вебхук удалён")
-    except Exception as e:
-        print(f"⚠️ Ошибка при удалении вебхука: {e}")
-    
-    # Запускаем веб-сервер
-    asyncio.create_task(start_web_server())
-    
     # Подключаем Telethon
     from username_checker import ensure_client
     await ensure_client()
     print("✅ Telethon готов к работе")
-
     
     logging.basicConfig(level=logging.INFO)
-    
+
     print("=" * 50)
     print("🤖 Бот запускается...")
     print("🔍 TON Checker: API проверка активирована")
@@ -1327,20 +1333,26 @@ async def main():
         print("⏳ Ожидаю сообщений через вебхук...")
         print("=" * 50)
 
-        # 👇 ЗАМЕНЯЕМ НА ВЕБХУК
-        await bot.delete_webhook()  # очищаем старый
-        await dp.start_webhook(
-            bot,
-            webhook_path='/webhook/platega',  # путь для вебхука
-            host='0.0.0.0',
-            port=8080
-        )
+        # Устанавливаем вебхук
+        await on_startup()
+
+        # Запускаем веб-сервер для приёма вебхуков
+        app = web.Application()
+        app.router.add_post('/webhook/platega', platega_webhook)
+        
+        runner = web.AppRunner(app)
+        await runner.setup()
+        site = web.TCPSite(runner, '0.0.0.0', 8080)
+        await site.start()
+        print("✅ Webhook сервер запущен на порту 8080")
+
+        # Держим бота запущенным
+        await asyncio.Event().wait()
 
     except Exception as e:
         print(f"❌ Ошибка запуска: {e}")
     finally:
-        await bot.session.close()
-        await dp.start_polling(bot)
+        await on_shutdown()
 
 if __name__ == "__main__":
     asyncio.run(main())
