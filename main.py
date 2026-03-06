@@ -1287,21 +1287,14 @@ async def on_shutdown():
 
 # ===== ЗАПУСК =====
 async def main():
-    # Регистрируем обработчики
-    dp.startup.register(on_startup)
-    dp.shutdown.register(on_shutdown)
     
-    # Запускаем в режиме вебхука (не polling!)
-    await bot.delete_webhook()  # очищаем старый
-    
-    # Запускаем веб-сервер aiogram
-    await dp.start_polling(bot)  # или start_webhook если нужен свой сервер
-    # Подключаем Telethon при запуске бота
+    # Подключаем Telethon
     from username_checker import ensure_client
     await ensure_client()
     print("✅ Telethon готов к работе")
+    
     logging.basicConfig(level=logging.INFO)
-
+    
     print("=" * 50)
     print("🤖 Бот запускается...")
     print("🔍 TON Checker: API проверка активирована")
@@ -1321,10 +1314,17 @@ async def main():
         print("📋 Команды:")
         print("/start /menu /stars /ton /premium")
         print("=" * 50)
-        print("⏳ Ожидаю сообщений...")
+        print("⏳ Ожидаю сообщений через вебхук...")
         print("=" * 50)
 
-        await dp.start_polling(bot, skip_updates=True)
+        # 👇 ЗАМЕНЯЕМ НА ВЕБХУК
+        await bot.delete_webhook()  # очищаем старый
+        await dp.start_webhook(
+            bot,
+            webhook_path='/webhook/platega',  # путь для вебхука
+            host='0.0.0.0',
+            port=8080
+        )
 
     except Exception as e:
         print(f"❌ Ошибка запуска: {e}")
