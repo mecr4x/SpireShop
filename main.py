@@ -17,7 +17,6 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.client.default import DefaultBotProperties
-from aiohttp import web
 import json
 import time
 
@@ -1268,22 +1267,37 @@ async def platega_webhook(request):
     except Exception as e:
         print(f"❌ Ошибка webhook: {e}")
         return web.Response(text="Error", status=500)
+        # ===== НАСТРОЙКА ВЕБХУКА =====
+async def on_startup():
+    """Действия при запуске бота"""
+    # Устанавливаем вебхук
+    webhook_url = "https://01kjwz01sk1rp562fdxzfjfw5v.hooks.webhookrelay.com/webhook/platega"
+    await bot.set_webhook(
+        url=webhook_url,
+        allowed_updates=["message", "callback_query"],
+        secret_token="твой_секрет"  # опционально, для безопасности
+    )
+    print(f"✅ Вебхук установлен: {webhook_url}")
 
-# ===== ЗАПУСК WEB-СЕРВЕРА =====
-async def start_web_server():
-    app = web.Application()
-    app.router.add_post('/webhook/platega', platega_webhook)
-    
-    runner = web.AppRunner(app)
-    await runner.setup()
-    site = web.TCPSite(runner, '0.0.0.0', 8080)
-    await site.start()
-    print("✅ Webhook сервер запущен на порту 8080")
+async def on_shutdown():
+    """Действия при остановке бота"""
+    # Удаляем вебхук
+    await bot.delete_webhook()
+    print("👋 Вебхук удалён")
+
+
 
 # ===== ЗАПУСК =====
 async def main():
-     # Запускаем webhook сервер
-    asyncio.create_task(start_web_server())
+    # Регистрируем обработчики
+    dp.startup.register(on_startup)
+    dp.shutdown.register(on_shutdown)
+    
+    # Запускаем в режиме вебхука (не polling!)
+    await bot.delete_webhook()  # очищаем старый
+    
+    # Запускаем веб-сервер aiogram
+    await dp.start_polling(bot)  # или start_webhook если нужен свой сервер
     # Подключаем Telethon при запуске бота
     from username_checker import ensure_client
     await ensure_client()
