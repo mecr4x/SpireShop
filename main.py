@@ -450,7 +450,7 @@ async def process_friend_username(message: Message, state: FSMContext):
 
     star_value = stars_data['star_value']
     formulastar = stars_data['formulastar']
-    star_ton = stars_data['star_ton']
+    star_ton = stars_data.get('formulaTON', stars_data.get('price_ton', 0))
 
     text = (
         f"<tg-emoji emoji-id=\"5438391541288689158\">⭐️</tg-emoji><b>Telegram Stars</b>\n\n"
