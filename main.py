@@ -1198,7 +1198,7 @@ async def sbp_payment(callback: CallbackQuery):
     if result["success"]:
         
         text = (
-            f"<tg-emoji emoji-id=\"5363972466857252756\">🏦</tg-emoji><b>Оплата по СБП</b>\n\n"
+            f"<tg-emoji emoji-id=\"5305413839066525446\">🏦</tg-emoji><b>Оплата по СБП</b>\n\n"
             f"{description}\n"
             f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Сумма:</b> {round(amount,1)}₽ (комиссия {amount - base_price}₽)\n"
             f"<tg-emoji emoji-id=\"5274099962655816924\">❗️</tg-emoji><b>Комиссия:</b> 8%\n\n"
