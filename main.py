@@ -230,7 +230,7 @@ async def process_stars_amount(message: Message, state: FSMContext):
     try:
         star_value = int(message.text.strip())
 
-        if star_value < 50 or star_value > 1000000:
+        if star_value < 1 or star_value > 1000000:
             error_msg = await message.answer("❌ Количество должно быть от 50 до 1,000,000")
             await save_and_delete_previous(message.from_user.id, error_msg.message_id)
             await asyncio.sleep(2)
@@ -486,7 +486,7 @@ async def ton_cmd(message: Message, state: FSMContext):
 
     text = (
         f"<tg-emoji emoji-id=\"5438332129006081114\">💎</tg-emoji><b>TON</b>\n\n"
-        f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Курс к рублю:</b> {round(TON_RUB + 30),1}₽\n"
+        f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Курс к рублю:</b> {round(TON_RUB + 30, 2}₽\n"
         f"<tg-emoji emoji-id=\"5447644880824181073\">⚠️</tg-emoji>️<b>Примечание:</b> TON поступает не на кошелек, а на Telegram аккаунт по @username."
         f"Использовать TON можно <b>только</b> в качестве покупки подарков на Telegram маркете, "
         f"а так же для оплаты за посты в Telegram каналах!\n\n"
@@ -1054,7 +1054,7 @@ async def crypto_payment(callback: CallbackQuery):
         text = (
             f"<tg-emoji emoji-id=\"5361914370068613491\">👛</tg-emoji><b>CryptoBot</b>\n\n"
             f"{description}\n"
-            f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Сумма:</b> {round(amount,1)}₽ (комиссия {round(commission,1)}₽)\n"
+            f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Сумма:</b> {round(amount,1)}₽ (комиссия {round(commission,2)}₽)\n"
             f"<tg-emoji emoji-id=\"5274099962655816924\">❗️</tg-emoji><b>Комиссия:</b>3%\n\n"
             f"👇Нажмите кнопку для оплаты:"
         )
@@ -1201,7 +1201,7 @@ async def sbp_payment(callback: CallbackQuery):
         text = (
             f"<tg-emoji emoji-id=\"5305413839066525446\">🏦</tg-emoji><b>Оплата по СБП</b>\n\n"
             f"{description}\n"
-            f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Сумма:</b> {round(amount,1)}₽ (комиссия {amount - base_price}₽)\n"
+            f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Сумма:</b> {round(amount,1)}₽ (комиссия {round(amount - base_price, 1)}₽)\n"
             f"<tg-emoji emoji-id=\"5274099962655816924\">❗️</tg-emoji><b>Комиссия:</b> 8%\n\n"
             f"👇Нажмите кнопку для оплаты"
         )
