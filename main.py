@@ -1268,7 +1268,7 @@ async def platega_webhook(request):
         print(f"❌ Ошибка webhook: {e}")
         return web.Response(text="Error", status=500)
         # ===== НАСТРОЙКА ВЕБХУКА =====
-async def on_startup():
+#async def on_startup():
     """Действия при запуске бота"""
     webhook_url = "https://01kjwz01sk1rp562fdxzfjfw5v.hooks.webhookrelay.com/webhook/platega"
     await bot.set_webhook(
@@ -1278,7 +1278,7 @@ async def on_startup():
     )
     print(f"✅ Вебхук установлен: {webhook_url}")
 
-async def on_shutdown():
+#async def on_shutdown():
     """Действия при остановке бота"""
     await bot.delete_webhook()
     await bot.session.close()
@@ -1287,11 +1287,21 @@ async def on_shutdown():
 
 # ===== ЗАПУСК =====
 async def main():
+    # Принудительно удаляем вебхук при каждом запуске
+    try:
+        await bot.delete_webhook()
+        print("✅ Вебхук удалён")
+    except Exception as e:
+        print(f"⚠️ Ошибка при удалении вебхука: {e}")
+    
+    # Запускаем веб-сервер
+    asyncio.create_task(start_web_server())
     
     # Подключаем Telethon
     from username_checker import ensure_client
     await ensure_client()
     print("✅ Telethon готов к работе")
+
     
     logging.basicConfig(level=logging.INFO)
     
@@ -1330,6 +1340,7 @@ async def main():
         print(f"❌ Ошибка запуска: {e}")
     finally:
         await bot.session.close()
+        await dp.start_polling(bot)
 
 if __name__ == "__main__":
     asyncio.run(main())
