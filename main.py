@@ -1140,11 +1140,18 @@ async def sbp_payment(callback: CallbackQuery):
     user_id = callback.from_user.id
     parts = callback.data.split("_")
     
-    if len(parts) >= 4:  # формат: sbp_тип_получатель_сумма
-        ptype = parts[1]        # stars, premium, ton
-        recipient = parts[2]     # self или friend
-        amount = float(parts[3]) # сумма
+    # 👇 ВРЕМЕННАЯ ОТЛАДКА
+    print(f"🔥 sbp_payment вызван с data: {callback.data}")
+    print(f"📦 parts: {parts}")
+    print(f"📦 len(parts): {len(parts)}")
+    
+    if len(parts) >= 4:
+        ptype = parts[1]
+        recipient = parts[2]
+        amount = float(parts[3])
+        print(f"✅ Тип: {ptype}, Получатель: {recipient}, Сумма: {amount}")
     else:
+        print(f"❌ Недостаточно частей: {len(parts)}")
         await callback.answer("❌ Ошибка", show_alert=True)
         return
     
