@@ -486,7 +486,7 @@ async def ton_cmd(message: Message, state: FSMContext):
 
     text = (
         f"<tg-emoji emoji-id=\"5438332129006081114\">💎</tg-emoji><b>TON</b>\n\n"
-        f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Курс к рублю:</b> {round(TON_RUB + 30, 2}₽\n"
+        f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Курс к рублю:</b> {round(TON_RUB + 30, 2)}₽\n"
         f"<tg-emoji emoji-id=\"5447644880824181073\">⚠️</tg-emoji>️<b>Примечание:</b> TON поступает не на кошелек, а на Telegram аккаунт по @username."
         f"Использовать TON можно <b>только</b> в качестве покупки подарков на Telegram маркете, "
         f"а так же для оплаты за посты в Telegram каналах!\n\n"
