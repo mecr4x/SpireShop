@@ -1270,21 +1270,19 @@ async def platega_webhook(request):
         # ===== НАСТРОЙКА ВЕБХУКА =====
 async def on_startup():
     """Действия при запуске бота"""
-    # Устанавливаем вебхук
     webhook_url = "https://01kjwz01sk1rp562fdxzfjfw5v.hooks.webhookrelay.com/webhook/platega"
     await bot.set_webhook(
         url=webhook_url,
         allowed_updates=["message", "callback_query"],
-        secret_token="твой_секрет"  # опционально, для безопасности
+        secret_token="SpireWebhookSecret2025"  # придумай сам
     )
     print(f"✅ Вебхук установлен: {webhook_url}")
 
 async def on_shutdown():
     """Действия при остановке бота"""
-    # Удаляем вебхук
     await bot.delete_webhook()
+    await bot.session.close()
     print("👋 Вебхук удалён")
-
 
 
 # ===== ЗАПУСК =====
