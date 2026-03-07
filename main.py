@@ -5,7 +5,6 @@ import logging
 import time
 import json
 
-# Для Windows
 if sys.platform == 'win32':
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
@@ -18,7 +17,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.client.default import DefaultBotProperties
 from aiohttp import web
-from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
+from aiogram.webhook.aiohttp_server import SimpleRequestHandler
 
 # ===== КОНФИГУРАЦИЯ =====
 BOT_TOKEN = "8236812443:AAGsoEmE7u9q5eBpKTQ3vlbp4IregP9-oHY"
@@ -43,7 +42,7 @@ processed_transactions = set()
 user_messages = {}
 user_data = {}
 
-# ===== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ =====
+# ===== ФУНКЦИИ ДЛЯ УДАЛЕНИЯ =====
 async def save_and_delete_previous(user_id: int, new_message_id: int):
     if user_id not in user_messages:
         user_messages[user_id] = []
@@ -74,7 +73,7 @@ class Form(StatesGroup):
     waiting_for_ton_friend_username = State()
     waiting_for_premium_friend = State()
 
-# ===== ХРАНИЛИЩЕ ДАННЫХ =====
+# ===== ХРАНИЛИЩЕ =====
 def save_user_data(user_id, key, value):
     if user_id not in user_data:
         user_data[user_id] = {}
@@ -87,8 +86,8 @@ async def get_ton_price():
     try:
         async with aiohttp.ClientSession() as session:
             async with session.get(
-                    'https://api.coingecko.com/api/v3/simple/price?ids=the-open-network&vs_currencies=rub',
-                    timeout=5
+                'https://api.coingecko.com/api/v3/simple/price?ids=the-open-network&vs_currencies=rub',
+                timeout=5
             ) as response:
                 data = await response.json()
                 return data['the-open-network']['rub']
@@ -1163,11 +1162,7 @@ async def platega_webhook(request: web.Request) -> web.Response:
                 
                 await bot.send_message(
                     user_id,
-                    f"✅ <b>Оплата подтверждена!</b>\n\n"
-                    f"Спасибо за покупку!\n"
-                    f"Товар: {ptype.upper()}\n"
-                    f"Сумма: {amount}₽\n\n"
-                    f"/menu — вернуться в меню"
+                    f"✅ <b>Оплата подтверждена!</b>\n\nСпасибо за покупку!\nТовар: {ptype.upper()}\nСумма: {amount}₽\n\n/menu — вернуться в меню"
                 )
                 
                 admin_text = (
