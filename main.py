@@ -16,19 +16,13 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.client.default import DefaultBotProperties
-from aiohttp import web
-from aiogram.webhook.aiohttp_server import SimpleRequestHandler
+from aiohttp import web  # 👈 для веб-сервера
 
 # ===== КОНФИГУРАЦИЯ =====
 BOT_TOKEN = "8236812443:AAGsoEmE7u9q5eBpKTQ3vlbp4IregP9-oHY"
 ADMIN_CHANNEL = '@spireshop01'
 SUPPORT_USERNAME = '@adamyan_ss'
 TON_WALLET = 'UQAL5Y75ykdUsMmW5FgnxKJyz1-njyS_oNuN1Lp2_hgNundO'
-
-# ===== НАСТРОЙКИ ВЕБХУКА =====
-WEBHOOK_HOST = "https://01kjwz01sk1rp562fdxzfjfw5v.hooks.webhookrelay.com"
-WEBHOOK_PATH = "/webhook/aiogram"
-WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
 
 # ===== ИНИЦИАЛИЗАЦИЯ =====
 bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode="HTML"))
@@ -38,9 +32,9 @@ dp.include_router(router)
 
 # ===== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ =====
 TON_RUB = 140
-processed_transactions = set()
 user_messages = {}
 user_data = {}
+processed_transactions = set()  # для защиты от дубликатов
 
 # ===== ФУНКЦИИ ДЛЯ УДАЛЕНИЯ =====
 async def save_and_delete_previous(user_id: int, new_message_id: int):
@@ -1134,6 +1128,7 @@ async def sbp_payment(callback: CallbackQuery):
 
 # ===== ВЕБХУК ДЛЯ PLATEGA =====
 async def platega_webhook(request: web.Request) -> web.Response:
+    """Обработчик вебхуков от Platega"""
     try:
         data = await request.json()
         print(f"📩 Platega webhook: {json.dumps(data, indent=2)}")
@@ -1142,6 +1137,7 @@ async def platega_webhook(request: web.Request) -> web.Response:
         status = data.get('status')
         payload = data.get('payload', '')
         
+        # Защита от дубликатов
         if transaction_id in processed_transactions:
             return web.Response(text="OK", status=200)
         processed_transactions.add(transaction_id)
@@ -1153,6 +1149,7 @@ async def platega_webhook(request: web.Request) -> web.Response:
                 ptype = parts[0]
                 amount = data.get('paymentDetails', {}).get('amount', 0)
                 
+                # Получаем username
                 username = "неизвестно"
                 try:
                     user = await bot.get_chat(user_id)
@@ -1160,11 +1157,17 @@ async def platega_webhook(request: web.Request) -> web.Response:
                 except:
                     username = f"id{user_id}"
                 
+                # Уведомление пользователю
                 await bot.send_message(
                     user_id,
-                    f"✅ <b>Оплата подтверждена!</b>\n\nСпасибо за покупку!\nТовар: {ptype.upper()}\nСумма: {amount}₽\n\n/menu — вернуться в меню"
+                    f"✅ <b>Оплата подтверждена!</b>\n\n"
+                    f"Спасибо за покупку!\n"
+                    f"Товар: {ptype.upper()}\n"
+                    f"Сумма: {amount}₽\n\n"
+                    f"/menu — вернуться в меню"
                 )
                 
+                # Уведомление админу
                 admin_text = (
                     f"💰 <b>Новый платёж!</b>\n\n"
                     f"👤 <b>Пользователь:</b> @{username}\n"
@@ -1178,24 +1181,25 @@ async def platega_webhook(request: web.Request) -> web.Response:
                 print(f"✅ Платёж подтверждён для user {user_id}, тип {ptype}")
         
         return web.Response(text="OK", status=200)
+        
     except Exception as e:
         print(f"❌ Ошибка webhook: {e}")
         return web.Response(text="Error", status=500)
 
+# ===== ЗАПУСК ВЕБ-СЕРВЕРА =====
+async def run_webhook_server():
+    """Запускает веб-сервер для приёма вебхуков от Platega"""
+    app = web.Application()
+    app.router.add_post('/webhook/platega', platega_webhook)
+    
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, '0.0.0.0', 8080)
+    await site.start()
+    print("✅ Webhook сервер запущен на порту 8080")
+    print("📍 Platega webhook: /webhook/platega")
+
 # ===== ЗАПУСК =====
-async def on_startup():
-    await bot.set_webhook(
-        url=WEBHOOK_URL,
-        allowed_updates=["message", "callback_query"],
-        drop_pending_updates=True
-    )
-    print(f"✅ Вебхук установлен: {WEBHOOK_URL}")
-
-async def on_shutdown():
-    await bot.delete_webhook()
-    await bot.session.close()
-    print("👋 Вебхук удалён")
-
 async def main():
     from username_checker import ensure_client
     await ensure_client()
@@ -1204,7 +1208,7 @@ async def main():
     logging.basicConfig(level=logging.INFO)
     
     print("=" * 50)
-    print("🤖 Бот запускается в режиме WEBHOOK...")
+    print("🤖 Бот запускается...")
     print("🔍 TON Checker: API проверка активирована")
     print("👤 Username Checker: Telethon проверка в отдельном файле")
     print("🧹 Удаление сообщений: Включено")
@@ -1219,29 +1223,22 @@ async def main():
         print(f"✅ Бот: @{me.username}")
 
         print("=" * 50)
-        print("📋 Команды будут работать через вебхук")
+        print("📋 Команды:")
+        print("/start /menu /stars /ton /premium")
+        print("=" * 50)
+        print("⏳ Ожидаю сообщений...")
         print("=" * 50)
 
-        await on_startup()
-
-        app = web.Application()
-        app.router.add_post('/webhook/platega', platega_webhook)
-        SimpleRequestHandler(dispatcher=dp, bot=bot).register(app, path=WEBHOOK_PATH)
+        # Запускаем веб-сервер в фоне
+        asyncio.create_task(run_webhook_server())
         
-        runner = web.AppRunner(app)
-        await runner.setup()
-        site = web.TCPSite(runner, '0.0.0.0', 8080)
-        await site.start()
-        print(f"✅ Веб-сервер запущен на порту 8080")
-        print(f"📍 Telegram webhook: {WEBHOOK_PATH}")
-        print(f"📍 Platega webhook: /webhook/platega")
-        
-        await asyncio.Event().wait()
+        # Запускаем polling (основной бот)
+        await dp.start_polling(bot, skip_updates=True)
 
     except Exception as e:
         print(f"❌ Ошибка запуска: {e}")
     finally:
-        await on_shutdown()
+        await bot.session.close()
 
 if __name__ == "__main__":
     asyncio.run(main())
