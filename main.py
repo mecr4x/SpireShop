@@ -1,11 +1,9 @@
-## main.py - ПОЛНАЯ ВЕРСИЯ С ВЕБХУКОМ И УВЕДОМЛЕНИЯМИ
+## main.py - ПОЛНАЯ ВЕРСИЯ С ВЕБХУКОМ
 import sys
 import asyncio
 import logging
 import time
 import json
-import hmac
-import hashlib
 
 # Для Windows
 if sys.platform == 'win32':
@@ -13,18 +11,17 @@ if sys.platform == 'win32':
 
 import aiohttp
 from aiogram import Bot, Dispatcher, Router, F
-from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, FSInputFile, Update
+from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, FSInputFile
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.client.default import DefaultBotProperties
-from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
 from aiohttp import web
 
 # ===== КОНФИГУРАЦИЯ =====
 BOT_TOKEN = "8236812443:AAGsoEmE7u9q5eBpKTQ3vlbp4IregP9-oHY"
-ADMIN_CHANNEL = '@spireshop01'  # Канал для уведомлений админа
+ADMIN_CHANNEL = '@spireshop01'
 SUPPORT_USERNAME = '@adamyan_ss'
 TON_WALLET = 'UQAL5Y75ykdUsMmW5FgnxKJyz1-njyS_oNuN1Lp2_hgNundO'
 
@@ -32,7 +29,7 @@ TON_WALLET = 'UQAL5Y75ykdUsMmW5FgnxKJyz1-njyS_oNuN1Lp2_hgNundO'
 WEBHOOK_HOST = "https://01kjwz01sk1rp562fdxzfjfw5v.hooks.webhookrelay.com"
 WEBHOOK_PATH = "/webhook/platega"
 WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
-WEBHOOK_SECRET = "spire_webhook_secret_2025"  # твой секрет (можно любой)
+WEBHOOK_SECRET = "spire_webhook_secret_2025"
 
 # ===== ИНИЦИАЛИЗАЦИЯ =====
 bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode="HTML"))
@@ -42,6 +39,7 @@ dp.include_router(router)
 
 # ===== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ =====
 TON_RUB = 140
+processed_transactions = set()  # для защиты от дубликатов
 
 # ===== ХРАНИЛИЩЕ ДЛЯ УДАЛЕНИЯ СООБЩЕНИЙ =====
 user_messages = {}
@@ -231,7 +229,7 @@ async def process_stars_amount(message: Message, state: FSMContext):
     try:
         star_value = int(message.text.strip())
 
-        if star_value < 1 or star_value > 1000000:
+        if star_value < 50 or star_value > 1000000:
             error_msg = await message.answer("❌ Количество должно быть от 50 до 1,000,000")
             await save_and_delete_previous(message.from_user.id, error_msg.message_id)
             await asyncio.sleep(2)
@@ -416,17 +414,12 @@ async def process_friend_username(message: Message, state: FSMContext):
 
     from username_checker import check_username
 
-  # ===== ПРОВЕРКА ЧЕРЕЗ username_checker.py =====
-    from username_checker import check_username
-
-    # Проверяем существует ли такой username
     check_msg = await message.answer("🔍 Проверяю существование пользователя...")
     result = await check_username(username)
     await delete_user_message(message.from_user.id, check_msg.message_id)
 
     if not result['exists']:
-        # Юзернейм не существует
-        error_text = f"❌Указанный пользователь не найден\n\n📥Пользователь: {username}"
+        error_text = f"❌ Указанный пользователь не найден\n\n📥 Пользователь: {username}"
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="Попробовать снова", callback_data="gift_stars_friend")]
         ])
@@ -435,7 +428,6 @@ async def process_friend_username(message: Message, state: FSMContext):
         await state.clear()
         return
 
-    # Юзернейм существует - продолжаем
     if not username.startswith('@'):
         username = f"@{username}"
 
@@ -449,7 +441,6 @@ async def process_friend_username(message: Message, state: FSMContext):
 
     star_value = stars_data['star_value']
     formulastar = stars_data['formulastar']
-    star_ton = stars_data.get('formulaTON', stars_data.get('price_ton', 0))
 
     text = (
         f"<tg-emoji emoji-id=\"5438391541288689158\">⭐️</tg-emoji><b>Telegram Stars</b>\n\n"
@@ -460,13 +451,13 @@ async def process_friend_username(message: Message, state: FSMContext):
     )
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="СБП", callback_data=f"sbp_stars_friend_{formulastar}", icon_custom_emoji_id = 5305413839066525446)],
-        [InlineKeyboardButton(text="Cryptobot", callback_data=f"crypto_stars_friend_{round (formulastar /0.97,1)}", icon_custom_emoji_id = 5361914370068613491)],
-        [InlineKeyboardButton(text="❌Отмена", callback_data="back_to_stars_choice")]
+        [InlineKeyboardButton(text="СБП", callback_data=f"sbp_stars_friend_{formulastar}", icon_custom_emoji_id=5305413839066525446)],
+        [InlineKeyboardButton(text="Cryptobot", callback_data=f"crypto_stars_friend_{round(formulastar / 0.97, 1)}", icon_custom_emoji_id=5361914370068613491)],
+        [InlineKeyboardButton(text="❌ Отмена", callback_data="back_to_stars_choice")]
     ])
 
     try:
-        sent_message = await message.answer_photo(caption=text, reply_markup=keyboard)
+        sent_message = await message.answer(text, reply_markup=keyboard)
     except:
         sent_message = await message.answer(text, reply_markup=keyboard)
 
@@ -1228,7 +1219,6 @@ async def sbp_payment(callback: CallbackQuery):
 async def platega_webhook(request: web.Request) -> web.Response:
     """Обработчик вебхуков от Platega"""
     try:
-        # Получаем данные
         data = await request.json()
         print(f"📩 Platega webhook: {json.dumps(data, indent=2)}")
         
@@ -1236,15 +1226,19 @@ async def platega_webhook(request: web.Request) -> web.Response:
         status = data.get('status')
         payload = data.get('payload', '')
         
+        # Защита от дубликатов
+        if transaction_id in processed_transactions:
+            return web.Response(text="OK", status=200)
+        processed_transactions.add(transaction_id)
+        
         if status == 'SUCCESS' and payload:
-            # Извлекаем данные из payload (формат: тип_userId_время)
             parts = payload.split('_')
             if len(parts) >= 2:
                 user_id = int(parts[1])
                 ptype = parts[0]
                 amount = data.get('paymentDetails', {}).get('amount', 0)
                 
-                # Получаем username пользователя
+                # Получаем username
                 username = "неизвестно"
                 try:
                     user = await bot.get_chat(user_id)
@@ -1252,29 +1246,27 @@ async def platega_webhook(request: web.Request) -> web.Response:
                 except:
                     username = f"id{user_id}"
                 
-                # Отправляем уведомление пользователю
+                # Уведомление пользователю
                 await bot.send_message(
                     user_id,
                     f"✅ <b>Оплата подтверждена!</b>\n\n"
                     f"Спасибо за покупку!\n"
+                    f"Товар: {ptype.upper()}\n"
+                    f"Сумма: {amount}₽\n\n"
+                    f"/menu — вернуться в меню"
                 )
                 
-                # 📢 УВЕДОМЛЕНИЕ АДМИНУ
+                # Уведомление админу
                 admin_text = (
                     f"💰 <b>Новый платёж!</b>\n\n"
                     f"👤 <b>Пользователь:</b> @{username}\n"
+                    f"🆔 <b>ID:</b> <code>{user_id}</code>\n"
                     f"📦 <b>Товар:</b> {ptype.upper()}\n"
                     f"💵 <b>Сумма:</b> {amount}₽\n"
-                    f"🧾 <b>Транзакция:</b> <code>{transaction_id}</code>\n"
-                    f"⏱ <b>Время:</b> {time.strftime('%Y-%m-%d %H:%M:%S')}"
+                    f"🧾 <b>Транзакция:</b> <code>{transaction_id}</code>"
                 )
                 
-                await bot.send_message(
-                    ADMIN_CHANNEL,
-                    admin_text,
-                    parse_mode="HTML"
-                )
-                
+                await bot.send_message(ADMIN_CHANNEL, admin_text, parse_mode="HTML")
                 print(f"✅ Платёж подтверждён для user {user_id}, тип {ptype}")
         
         return web.Response(text="OK", status=200)
@@ -1283,55 +1275,10 @@ async def platega_webhook(request: web.Request) -> web.Response:
         print(f"❌ Ошибка webhook: {e}")
         return web.Response(text="Error", status=500)
 
-# ===== WEBHOOK ДЛЯ PLATEGA =====
-async def platega_webhook(request):
-    """Принимает уведомления от Platega"""
-    try:
-        data = await request.json()
-        print(f"📩 Platega webhook: {data}")
-        
-        transaction_id = data.get('transactionId')
-        
-        # Игнорируем дубликаты
-        if transaction_id in processed_transactions:
-            return web.Response(text="OK", status=200)
-        
-        processed_transactions.add(transaction_id)
-        
-        # Очистка старых записей (раз в час)
-        if len(processed_transactions) > 1000:
-            processed_transactions.clear()
-        
-        # Проверяем статус платежа
-        if data.get('status') == 'SUCCESS':
-            payload = data.get('payload', '')
-            
-            # Извлекаем user_id из payload (формат: тип_userId_время)
-            if payload:
-                parts = payload.split('_')
-                if len(parts) >= 2:
-                    user_id = int(parts[1])
-                    ptype = parts[0]
-                    
-                    # Уведомляем пользователя
-                    await bot.send_message(
-                        user_id,
-                        f"✅ Оплата через СБП подтверждена!\nСпасибо за покупку!"
-                    )
-                    
-                    print(f"✅ Платёж подтверждён для user {user_id}, тип {ptype}")
-        
-        return web.Response(text="OK", status=200)
-        
-    except Exception as e:
-        print(f"❌ Ошибка webhook: {e}")
-        return web.Response(text="Error", status=500)
 
-
-# ===== ЗАПУСК ВЕБ-СЕРВЕРА =====
+# ===== ЗАПУСК =====
 async def on_startup():
     """Действия при запуске"""
-    # Устанавливаем вебхук
     await bot.set_webhook(
         url=WEBHOOK_URL,
         allowed_updates=["message", "callback_query"],
@@ -1345,19 +1292,14 @@ async def on_shutdown():
     await bot.session.close()
     print("👋 Вебхук удалён")
 
-# ===== ЗАПУСК =====
 async def main():
-    # Принудительно удаляем вебхук перед запуском
-    await bot.delete_webhook()
-    print("✅ Вебхук удалён")
-    
     # Подключаем Telethon
     from username_checker import ensure_client
     await ensure_client()
     print("✅ Telethon готов к работе")
     
     logging.basicConfig(level=logging.INFO)
-
+    
     print("=" * 50)
     print("🤖 Бот запускается...")
     print("🔍 TON Checker: API проверка активирована")
@@ -1380,13 +1322,31 @@ async def main():
         print("⏳ Ожидаю сообщений...")
         print("=" * 50)
 
-        # Запускаем polling (чтобы бот получал команды)
-        await dp.start_polling(bot, skip_updates=True)
+        # Запускаем веб-сервер
+        app = web.Application()
+        app.router.add_post('/webhook/platega', platega_webhook)
+        
+        # Добавляем эндпоинт для проверки
+        async def health(request):
+            return web.Response(text="OK")
+        app.router.add_get('/health', health)
+        
+        runner = web.AppRunner(app)
+        await runner.setup()
+        site = web.TCPSite(runner, '0.0.0.0', 8080)
+        await site.start()
+        print("✅ Веб-сервер запущен на порту 8080")
+        
+        # Устанавливаем вебхук
+        await on_startup()
+        
+        # Держим бота запущенным
+        await asyncio.Event().wait()
 
     except Exception as e:
         print(f"❌ Ошибка запуска: {e}")
     finally:
-        await bot.session.close()
+        await on_shutdown()
 
 if __name__ == "__main__":
     asyncio.run(main())
