@@ -1,10 +1,9 @@
-## main.py - ЕДИНЫЙ ФАЙЛ (бот + вебхук)
+## main.py - ТОЛЬКО ВЕБХУК (БЕЗ POLLING)
 import sys
 import asyncio
 import logging
 import time
 import json
-import threading
 
 # Для Windows
 if sys.platform == 'win32':
@@ -19,12 +18,18 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.client.default import DefaultBotProperties
 from aiohttp import web
+from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
 
 # ===== КОНФИГУРАЦИЯ =====
 BOT_TOKEN = "8236812443:AAGsoEmE7u9q5eBpKTQ3vlbp4IregP9-oHY"
 ADMIN_CHANNEL = '@spireshop01'
 SUPPORT_USERNAME = '@adamyan_ss'
 TON_WALLET = 'UQAL5Y75ykdUsMmW5FgnxKJyz1-njyS_oNuN1Lp2_hgNundO'
+
+# ===== НАСТРОЙКИ ВЕБХУКА =====
+WEBHOOK_HOST = "https://01kjwz01sk1rp562fdxzfjfw5v.hooks.webhookrelay.com"
+WEBHOOK_PATH = "/webhook/aiogram"
+WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
 
 # ===== ИНИЦИАЛИЗАЦИЯ =====
 bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode="HTML"))
@@ -37,7 +42,6 @@ TON_RUB = 140
 processed_transactions = set()
 user_messages = {}
 user_data = {}
-webhook_task = None
 
 # ===== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ =====
 async def save_and_delete_previous(user_id: int, new_message_id: int):
@@ -90,6 +94,7 @@ async def get_ton_price():
                 return data['the-open-network']['rub']
     except:
         return 140
+
 
 # ===== КОМАНДА /START =====
 @router.message(Command("start"))
@@ -1182,21 +1187,20 @@ async def platega_webhook(request: web.Request) -> web.Response:
         print(f"❌ Ошибка webhook: {e}")
         return web.Response(text="Error", status=500)
 
-# ===== ЗАПУСК ВЕБ-СЕРВЕРА =====
-async def run_webhook_server():
-    app = web.Application()
-    app.router.add_post('/webhook/platega', platega_webhook)
-    
-    runner = web.AppRunner(app)
-    await runner.setup()
-    site = web.TCPSite(runner, '0.0.0.0', 8081)
-    await site.start()
-    print("✅ Webhook сервер запущен на порту 8081")
-    
-    # Держим веб-сервер запущенным
-    await asyncio.Event().wait()
-
 # ===== ЗАПУСК =====
+async def on_startup():
+    await bot.set_webhook(
+        url=WEBHOOK_URL,
+        allowed_updates=["message", "callback_query"],
+        drop_pending_updates=True
+    )
+    print(f"✅ Вебхук установлен: {WEBHOOK_URL}")
+
+async def on_shutdown():
+    await bot.delete_webhook()
+    await bot.session.close()
+    print("👋 Вебхук удалён")
+
 async def main():
     from username_checker import ensure_client
     await ensure_client()
@@ -1205,7 +1209,7 @@ async def main():
     logging.basicConfig(level=logging.INFO)
     
     print("=" * 50)
-    print("🤖 Бот запускается...")
+    print("🤖 Бот запускается в режиме WEBHOOK...")
     print("🔍 TON Checker: API проверка активирована")
     print("👤 Username Checker: Telethon проверка в отдельном файле")
     print("🧹 Удаление сообщений: Включено")
@@ -1220,22 +1224,37 @@ async def main():
         print(f"✅ Бот: @{me.username}")
 
         print("=" * 50)
-        print("📋 Команды:")
-        print("/start /menu /stars /ton /premium")
-        print("=" * 50)
-        print("⏳ Ожидаю сообщений...")
+        print("📋 Команды будут работать через вебхук")
         print("=" * 50)
 
-        # 👇 ЗАПУСКАЕМ ВЕБ-СЕРВЕР В ФОНЕ
-        asyncio.create_task(run_webhook_server())
+        # Устанавливаем вебхук
+        await on_startup()
+
+        # Запускаем веб-сервер
+        app = web.Application()
         
-        # 👇 ЗАПУСКАЕМ POLLING (ОСНОВНОЙ БОТ)
-        await dp.start_polling(bot, skip_updates=True)
+        # Регистрируем вебхук для Platega
+        app.router.add_post('/webhook/platega', platega_webhook)
+        
+        # Регистрируем вебхук для Telegram
+        SimpleRequestHandler(dispatcher=dp, bot=bot).register(app, path=WEBHOOK_PATH)
+        
+        # Запускаем сервер
+        runner = web.AppRunner(app)
+        await runner.setup()
+        site = web.TCPSite(runner, '0.0.0.0', 8080)
+        await site.start()
+        print(f"✅ Веб-сервер запущен на порту 8080")
+        print(f"📍 Telegram webhook: {WEBHOOK_PATH}")
+        print(f"📍 Platega webhook: /webhook/platega")
+        
+        # Держим сервер запущенным
+        await asyncio.Event().wait()
 
     except Exception as e:
         print(f"❌ Ошибка запуска: {e}")
     finally:
-        await bot.session.close()
+        await on_shutdown()
 
 if __name__ == "__main__":
     asyncio.run(main())
