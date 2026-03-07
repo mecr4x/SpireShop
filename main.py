@@ -1227,19 +1227,12 @@ async def main():
         print("📋 Команды будут работать через вебхук")
         print("=" * 50)
 
-        # Устанавливаем вебхук
         await on_startup()
 
-        # Запускаем веб-сервер
         app = web.Application()
-        
-        # Регистрируем вебхук для Platega
         app.router.add_post('/webhook/platega', platega_webhook)
-        
-        # Регистрируем вебхук для Telegram
         SimpleRequestHandler(dispatcher=dp, bot=bot).register(app, path=WEBHOOK_PATH)
         
-        # Запускаем сервер
         runner = web.AppRunner(app)
         await runner.setup()
         site = web.TCPSite(runner, '0.0.0.0', 8080)
@@ -1248,7 +1241,6 @@ async def main():
         print(f"📍 Telegram webhook: {WEBHOOK_PATH}")
         print(f"📍 Platega webhook: /webhook/platega")
         
-        # Держим сервер запущенным
         await asyncio.Event().wait()
 
     except Exception as e:
