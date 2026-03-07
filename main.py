@@ -1162,29 +1162,24 @@ async def sbp_payment(callback: CallbackQuery):
     
     # 👇 ГЛОБАЛЬНАЯ ПЕРЕМЕННАЯ КУРСА TON
     global TON_RUB
-
-    # 👇 ЗАДАЁМ НАЧАЛЬНЫЕ ЗНАЧЕНИЯ
-    description = f"Оплата {amount}₽"
-    base_price = amount  # значение по умолчанию
-    final_amount = amount
     
     # Определяем описание и разделяем цены
     if ptype == "stars" and stars_data:
         star_value = stars_data.get('star_value', '?')
-        description = f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> {star_value} звёзд"
+        descriptio = f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> {star_value} звёзд"
         base_price = round(star_value * 1.5, 1)  # твой доход
         final_amount = round(base_price / 0.92, 1)  # клиент платит
 
     elif ptype == "premium" and premium_data:
         period = premium_data.get('period', 'Premium')
-        description = f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> Telegram Premium на {period}"
+        descriptio = f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> Telegram Premium на {period}"
         base_prices = {"12 месяцев": 2800, "6 месяцев": 1500, "3 месяца": 1200}
         base_price = base_prices.get(period, amount)
         final_amount = round(base_price / 0.92, 1)
 
     elif ptype == "ton" and ton_data:
         ton_value = ton_data.get('ton_value', '?')
-        description = f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> {ton_value} TON"
+        descriptio = f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> {ton_value} TON"
         base_price = round(ton_value * TON_RUB, 1)
         final_amount = round(base_price / 0.92, 1)
     
@@ -1205,7 +1200,7 @@ async def sbp_payment(callback: CallbackQuery):
     if result["success"]:
         text = (
             f"<tg-emoji emoji-id=\"5305413839066525446\">🏦</tg-emoji><b>Оплата по СБП</b>\n\n"
-            f"{description}\n"
+            f"{descriptio}\n"
             f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Сумма к оплате:</b> {round(final_amount,1)}₽ (комиссия {round(final_amount - base_price, 1)}₽)\n"
             f"<tg-emoji emoji-id=\"5274099962655816924\">❗️</tg-emoji><b>Комиссия сервиса:</b> 8%\n\n"
             f"👇 Нажмите кнопку для оплаты, а после подтвердите оплату, нажав на \"<tg-emoji emoji-id=\"5206607081334906820\">✔️</tg-emoji>Оплатил\""
