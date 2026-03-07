@@ -1162,25 +1162,38 @@ async def sbp_payment(callback: CallbackQuery):
     
     # 👇 ГЛОБАЛЬНАЯ ПЕРЕМЕННАЯ КУРСА TON
     global TON_RUB
+
+    # 👇 ЗАДАЁМ НАЧАЛЬНЫЕ ЗНАЧЕНИЯ
+    description = f"Оплата {amount}₽"
+    base_price = amount
+    final_amount = amount
     
-    # Определяем описание и разделяем цены
+    # Определяем описание и разделяем цены для каждого типа товара
     if ptype == "stars" and stars_data:
         star_value = stars_data.get('star_value', '?')
         description = f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> {star_value} звёзд"
-        base_price = round(star_value * 1.5, 1)  # твой доход
-        final_amount = round(base_price / 0.92, 1)  # клиент платит
+        base_price = round(star_value * 1.5, 1)  # ТВОЯ ЦЕНА: 1.7 за звезду
+        final_amount = round(base_price / 0.92, 1)
 
     elif ptype == "premium" and premium_data:
         period = premium_data.get('period', 'Premium')
+        priceprem = premium_data.get('priceprem', amount)
+        print(f"👑 Premium данные: period={period}, priceprem={priceprem}")
+        
         description = f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> Telegram Premium на {period}"
-        base_prices = {"12 месяцев": 2800, "6 месяцев": 1500, "3 месяца": 1200}
-        base_price = base_prices.get(period, amount)
+        # ТВОИ ЦЕНЫ
+        base_prices = {
+            "12 месяцев": 2800,
+            "6 месяцев": 1500, 
+            "3 месяца": 1200
+        }
+        base_price = base_prices.get(period, priceprem)
         final_amount = round(base_price / 0.92, 1)
 
     elif ptype == "ton" and ton_data:
         ton_value = ton_data.get('ton_value', '?')
         description = f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> {ton_value} TON"
-        base_price = round(ton_value * TON_RUB, 1)
+        base_price = round(ton_value * (TON_RUB + 20), 1)  # ТВОЙ КУРС: TON_RUB + 30
         final_amount = round(base_price / 0.92, 1)
     
     order_id = f"{ptype}_{user_id}_{int(time.time())}"
@@ -1189,15 +1202,17 @@ async def sbp_payment(callback: CallbackQuery):
     
     from username_checker import create_platega_invoice
     
-    platega_description = f"{ptype.upper()} {final_amount}₽"  # простой текст для API
-
-    result = await create_platega_invoice(  # ← 4 пробела
+    # Простое описание для Platega (без эмодзи)
+    platega_description = f"{ptype.upper()} {round(final_amount,1)}₽"
+    
+    result = await create_platega_invoice(
         amount_rub=final_amount,
         description=platega_description,
         order_id=order_id
     )
     
-    await delete_user_message(user_id, wait_msg.message_id)  # ← тоже 4 пробела
+    await delete_user_message(user_id, wait_msg.message_id)
+
     if result["success"]:
         text = (
             f"<tg-emoji emoji-id=\"5305413839066525446\">🏦</tg-emoji><b>Оплата по СБП</b>\n\n"
@@ -1233,7 +1248,7 @@ async def paid_callback(callback: CallbackQuery):
         # Благодарность пользователю
         await callback.message.answer(
             f"<b>Спасибо за покупку!</b>\n\n"
-            f"Администратор уже получил уведомление и скоро обработает заказ."
+            f"Администратор уже получил уведомление и скоро обработает заказ.\n"
             f"Ждем вас снова в SpireShop<tg-emoji emoji-id=\"5368469082867769478\">😘</tg-emoji>"
         )
         
