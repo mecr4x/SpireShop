@@ -1166,20 +1166,20 @@ async def sbp_payment(callback: CallbackQuery):
     # Определяем описание и разделяем цены
     if ptype == "stars" and stars_data:
         star_value = stars_data.get('star_value', '?')
-        descriptio = f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> {star_value} звёзд"
+        description = f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> {star_value} звёзд"
         base_price = round(star_value * 1.5, 1)  # твой доход
         final_amount = round(base_price / 0.92, 1)  # клиент платит
 
     elif ptype == "premium" and premium_data:
         period = premium_data.get('period', 'Premium')
-        descriptio = f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> Telegram Premium на {period}"
+        description = f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> Telegram Premium на {period}"
         base_prices = {"12 месяцев": 2800, "6 месяцев": 1500, "3 месяца": 1200}
         base_price = base_prices.get(period, amount)
         final_amount = round(base_price / 0.92, 1)
 
     elif ptype == "ton" and ton_data:
         ton_value = ton_data.get('ton_value', '?')
-        descriptio = f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> {ton_value} TON"
+        description = f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> {ton_value} TON"
         base_price = round(ton_value * TON_RUB, 1)
         final_amount = round(base_price / 0.92, 1)
     
@@ -1189,18 +1189,20 @@ async def sbp_payment(callback: CallbackQuery):
     
     from username_checker import create_platega_invoice
     
-    result = await create_platega_invoice(
-        amount_rub=final_amount,  # 👈 клиент платит эту сумму
-        descriptio=descriptio,
-        order_id=order_id
-    )
+    platega_description = f"{ptype.upper()} {final_amount}₽"  # простой текст для API
+
+result = await create_platega_invoice(
+    amount_rub=final_amount,
+    description=platega_description,  # для Platega
+    order_id=order_id
+)
     
     await delete_user_message(user_id, wait_msg.message_id)
 
     if result["success"]:
         text = (
             f"<tg-emoji emoji-id=\"5305413839066525446\">🏦</tg-emoji><b>Оплата по СБП</b>\n\n"
-            f"{descriptio}\n"
+            f"{description}\n"
             f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Сумма к оплате:</b> {round(final_amount,1)}₽ (комиссия {round(final_amount - base_price, 1)}₽)\n"
             f"<tg-emoji emoji-id=\"5274099962655816924\">❗️</tg-emoji><b>Комиссия сервиса:</b> 8%\n\n"
             f"👇 Нажмите кнопку для оплаты, а после подтвердите оплату, нажав на \"<tg-emoji emoji-id=\"5206607081334906820\">✔️</tg-emoji>Оплатил\""
