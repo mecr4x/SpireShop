@@ -1,4 +1,4 @@
-## main.py - ТОЛЬКО ВЕБХУК (БЕЗ POLLING)
+## main.py - ИСПРАВЛЕННАЯ ВЕРСИЯ (твой код + вебхук)
 import sys
 import asyncio
 import logging
@@ -11,7 +11,7 @@ if sys.platform == 'win32':
 
 import aiohttp
 from aiogram import Bot, Dispatcher, Router, F
-from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, FSInputFile, Update
+from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, FSInputFile
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -27,9 +27,8 @@ TON_WALLET = 'UQAL5Y75ykdUsMmW5FgnxKJyz1-njyS_oNuN1Lp2_hgNundO'
 
 # ===== НАСТРОЙКИ ВЕБХУКА =====
 WEBHOOK_HOST = "https://01kjwz01sk1rp562fdxzfjfw5v.hooks.webhookrelay.com"
-WEBHOOK_PATH = "/webhook/aiogram"  # 👈 путь для aiogram
+WEBHOOK_PATH = "/webhook/aiogram"
 WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
-WEBHOOK_SECRET = "spire_webhook_secret_2025"
 
 # ===== ИНИЦИАЛИЗАЦИЯ =====
 bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode="HTML"))
@@ -1292,7 +1291,6 @@ async def on_startup():
     await bot.set_webhook(
         url=WEBHOOK_URL,
         allowed_updates=["message", "callback_query"],
-        secret_token=WEBHOOK_SECRET,
         drop_pending_updates=True
     )
     print(f"✅ Вебхук установлен: {WEBHOOK_URL}")
@@ -1342,22 +1340,15 @@ async def main():
         # Регистрируем обработчик вебхука от Platega
         app.router.add_post('/webhook/platega', platega_webhook)
         
-        # Регистрируем обработчик вебхука от Telegram (aiogram)
+        # Регистрируем обработчик вебхука от Telegram
         from aiogram.webhook.aiohttp_server import SimpleRequestHandler
         SimpleRequestHandler(dispatcher=dp, bot=bot).register(app, path=WEBHOOK_PATH)
-        
-        # Эндпоинт для проверки
-        async def health(request):
-            return web.Response(text="Webhook server is running")
-        app.router.add_get('/health', health)
         
         runner = web.AppRunner(app)
         await runner.setup()
         site = web.TCPSite(runner, '0.0.0.0', 8080)
         await site.start()
         print("✅ Веб-сервер запущен на порту 8080")
-        print(f"📍 Platega webhook: /webhook/platega")
-        print(f"📍 Telegram webhook: {WEBHOOK_PATH}")
         
         # Держим бота запущенным
         await asyncio.Event().wait()
