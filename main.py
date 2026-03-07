@@ -1128,18 +1128,16 @@ async def sbp_payment(callback: CallbackQuery):
 
 # ===== ВЕБХУК ДЛЯ PLATEGA =====
 async def platega_webhook(request: web.Request) -> web.Response:
-    """Обработчик вебхуков от Platega"""
     try:
         data = await request.json()
-        print(f"📩 Platega webhook: {json.dumps(data, indent=2)}")
+        print(f"✅ ПОЛУЧЕН ПЛАТЁЖ: {json.dumps(data)}")
         
         transaction_id = data.get('transactionId')
         status = data.get('status')
         payload = data.get('payload', '')
         
-        # Защита от дубликатов
         if transaction_id in processed_transactions:
-            return web.Response(text="OK", status=200)
+            return web.Response(text="OK")
         processed_transactions.add(transaction_id)
         
         if status == 'SUCCESS' and payload:
@@ -1149,46 +1147,23 @@ async def platega_webhook(request: web.Request) -> web.Response:
                 ptype = parts[0]
                 amount = data.get('paymentDetails', {}).get('amount', 0)
                 
-                # Получаем username
-                username = "неизвестно"
-                try:
-                    user = await bot.get_chat(user_id)
-                    username = user.username or f"id{user_id}"
-                except:
-                    username = f"id{user_id}"
-                
-                # Уведомление пользователю
                 await bot.send_message(
                     user_id,
-                    f"✅ <b>Оплата подтверждена!</b>\n\n"
-                    f"Спасибо за покупку!\n"
-                    f"Товар: {ptype.upper()}\n"
-                    f"Сумма: {amount}₽\n\n"
-                    f"/menu — вернуться в меню"
+                    f"✅ Оплата подтверждена!\nТовар: {ptype}\nСумма: {amount}₽"
                 )
                 
-                # Уведомление админу
-                admin_text = (
-                    f"💰 <b>Новый платёж!</b>\n\n"
-                    f"👤 <b>Пользователь:</b> @{username}\n"
-                    f"🆔 <b>ID:</b> <code>{user_id}</code>\n"
-                    f"📦 <b>Товар:</b> {ptype.upper()}\n"
-                    f"💵 <b>Сумма:</b> {amount}₽\n"
-                    f"🧾 <b>Транзакция:</b> <code>{transaction_id}</code>"
+                await bot.send_message(
+                    ADMIN_CHANNEL,
+                    f"💰 Новый платёж!\nПользователь: {user_id}\nТовар: {ptype}\nСумма: {amount}₽"
                 )
-                
-                await bot.send_message(ADMIN_CHANNEL, admin_text, parse_mode="HTML")
-                print(f"✅ Платёж подтверждён для user {user_id}, тип {ptype}")
         
-        return web.Response(text="OK", status=200)
-        
+        return web.Response(text="OK")
     except Exception as e:
-        print(f"❌ Ошибка webhook: {e}")
+        print(f"❌ Ошибка: {e}")
         return web.Response(text="Error", status=500)
 
-# ===== ЗАПУСК ВЕБ-СЕРВЕРА =====
-async def run_webhook_server():
-    """Запускает веб-сервер для приёма вебхуков от Platega"""
+# ===== ЗАПУСК =====
+async def main():
     app = web.Application()
     app.router.add_post('/webhook/platega', platega_webhook)
     
@@ -1196,49 +1171,10 @@ async def run_webhook_server():
     await runner.setup()
     site = web.TCPSite(runner, '0.0.0.0', 8080)
     await site.start()
-    print("✅ Webhook сервер запущен на порту 8080")
+    print("✅ Сервер запущен на порту 8080")
     print("📍 Platega webhook: /webhook/platega")
-
-# ===== ЗАПУСК =====
-async def main():
-    from username_checker import ensure_client
-    await ensure_client()
-    print("✅ Telethon готов к работе")
     
-    logging.basicConfig(level=logging.INFO)
-    
-    print("=" * 50)
-    print("🤖 Бот запускается...")
-    print("🔍 TON Checker: API проверка активирована")
-    print("👤 Username Checker: Telethon проверка в отдельном файле")
-    print("🧹 Удаление сообщений: Включено")
-    print("=" * 50)
-
-    try:
-        global TON_RUB
-        TON_RUB = await get_ton_price()
-        print(f"💰 Курс TON: {TON_RUB}₽")
-
-        me = await bot.get_me()
-        print(f"✅ Бот: @{me.username}")
-
-        print("=" * 50)
-        print("📋 Команды:")
-        print("/start /menu /stars /ton /premium")
-        print("=" * 50)
-        print("⏳ Ожидаю сообщений...")
-        print("=" * 50)
-
-        # Запускаем веб-сервер в фоне
-        asyncio.create_task(run_webhook_server())
-        
-        # Запускаем polling (основной бот)
-        await dp.start_polling(bot, skip_updates=True)
-
-    except Exception as e:
-        print(f"❌ Ошибка запуска: {e}")
-    finally:
-        await bot.session.close()
+    await asyncio.Event().wait()
 
 if __name__ == "__main__":
     asyncio.run(main())
