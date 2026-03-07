@@ -1269,16 +1269,6 @@ async def platega_webhook(request):
         print(f"❌ Ошибка webhook: {e}")
         return web.Response(text="Error", status=500)
 
-# ===== ЗАПУСК WEB-СЕРВЕРА =====
-async def start_web_server():
-    app = web.Application()
-    app.router.add_post('/webhook/platega', platega_webhook)
-    
-    runner = web.AppRunner(app)
-    await runner.setup()
-    site = web.TCPSite(runner, '0.0.0.0', 8080)
-    await site.start()
-    print("✅ Webhook сервер запущен на порту 8080")
 
 async def main():
     # СНАЧАЛА удаляем вебхук (до всего остального)
