@@ -1,4 +1,4 @@
-## main.py - ПОЛНАЯ РАБОЧАЯ ВЕРСИЯ С ВЕБХУКОМ
+## main.py - ПОЛНАЯ РАБОЧАЯ ВЕРСИЯ
 import sys
 import asyncio
 import logging
@@ -18,6 +18,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.client.default import DefaultBotProperties
 from aiohttp import web
+from aiogram.webhook.aiohttp_server import SimpleRequestHandler
 
 # ===== КОНФИГУРАЦИЯ =====
 BOT_TOKEN = "8236812443:AAGsoEmE7u9q5eBpKTQ3vlbp4IregP9-oHY"
@@ -39,10 +40,10 @@ dp.include_router(router)
 # ===== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ =====
 TON_RUB = 140
 processed_transactions = set()
+user_messages = {}
+user_data = {}
 
 # ===== ХРАНИЛИЩЕ ДЛЯ УДАЛЕНИЯ СООБЩЕНИЙ =====
-user_messages = {}
-
 async def save_and_delete_previous(user_id: int, new_message_id: int):
     if user_id not in user_messages:
         user_messages[user_id] = []
@@ -74,8 +75,6 @@ class Form(StatesGroup):
     waiting_for_premium_friend = State()
 
 # ===== ХРАНИЛИЩЕ ДАННЫХ =====
-user_data = {}
-
 def save_user_data(user_id, key, value):
     if user_id not in user_data:
         user_data[user_id] = {}
@@ -1076,6 +1075,7 @@ async def sbp_payment(callback: CallbackQuery):
     description = f"Оплата {amount}₽"
     
     wait_msg = await callback.message.answer("Создаю ссылку для оплаты...")
+    
     from username_checker import create_platega_invoice
     
     # Определяем описание и комиссию
@@ -1233,8 +1233,6 @@ async def main():
 
         app = web.Application()
         app.router.add_post('/webhook/platega', platega_webhook)
-        
-        from aiogram.webhook.aiohttp_server import SimpleRequestHandler
         SimpleRequestHandler(dispatcher=dp, bot=bot).register(app, path=WEBHOOK_PATH)
         
         runner = web.AppRunner(app)
