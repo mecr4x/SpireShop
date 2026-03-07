@@ -1200,7 +1200,7 @@ async def sbp_payment(callback: CallbackQuery):
     )
     await delete_user_message(user_id, wait_msg.message_id)
 
-  if result["success"]:
+ if result["success"]:
     text = (
         f"<tg-emoji emoji-id=\"5305413839066525446\">🏦</tg-emoji><b>Оплата по СБП</b>\n\n"
         f"{description}\n"
