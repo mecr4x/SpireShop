@@ -1191,7 +1191,7 @@ async def sbp_payment(callback: CallbackQuery):
     
     result = await create_platega_invoice(
         amount_rub=final_amount,  # 👈 клиент платит эту сумму
-        description=description,
+        descriptio=descriptio,
         order_id=order_id
     )
     
