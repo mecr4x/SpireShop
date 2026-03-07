@@ -1,8 +1,10 @@
-## main.py - ТОЛЬКО POLLING
+## main.py - ЕДИНЫЙ ФАЙЛ (бот + вебхук)
 import sys
 import asyncio
 import logging
 import time
+import json
+import threading
 
 # Для Windows
 if sys.platform == 'win32':
@@ -16,6 +18,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.client.default import DefaultBotProperties
+from aiohttp import web
 
 # ===== КОНФИГУРАЦИЯ =====
 BOT_TOKEN = "8236812443:AAGsoEmE7u9q5eBpKTQ3vlbp4IregP9-oHY"
@@ -31,8 +34,10 @@ dp.include_router(router)
 
 # ===== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ =====
 TON_RUB = 140
+processed_transactions = set()
 user_messages = {}
 user_data = {}
+webhook_task = None
 
 # ===== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ =====
 async def save_and_delete_previous(user_id: int, new_message_id: int):
@@ -1123,6 +1128,74 @@ async def sbp_payment(callback: CallbackQuery):
     
     await callback.answer()
 
+# ===== ВЕБХУК ДЛЯ PLATEGA =====
+async def platega_webhook(request: web.Request) -> web.Response:
+    try:
+        data = await request.json()
+        print(f"📩 Platega webhook: {json.dumps(data, indent=2)}")
+        
+        transaction_id = data.get('transactionId')
+        status = data.get('status')
+        payload = data.get('payload', '')
+        
+        if transaction_id in processed_transactions:
+            return web.Response(text="OK", status=200)
+        processed_transactions.add(transaction_id)
+        
+        if status == 'SUCCESS' and payload:
+            parts = payload.split('_')
+            if len(parts) >= 2:
+                user_id = int(parts[1])
+                ptype = parts[0]
+                amount = data.get('paymentDetails', {}).get('amount', 0)
+                
+                username = "неизвестно"
+                try:
+                    user = await bot.get_chat(user_id)
+                    username = user.username or f"id{user_id}"
+                except:
+                    username = f"id{user_id}"
+                
+                await bot.send_message(
+                    user_id,
+                    f"✅ <b>Оплата подтверждена!</b>\n\n"
+                    f"Спасибо за покупку!\n"
+                    f"Товар: {ptype.upper()}\n"
+                    f"Сумма: {amount}₽\n\n"
+                    f"/menu — вернуться в меню"
+                )
+                
+                admin_text = (
+                    f"💰 <b>Новый платёж!</b>\n\n"
+                    f"👤 <b>Пользователь:</b> @{username}\n"
+                    f"🆔 <b>ID:</b> <code>{user_id}</code>\n"
+                    f"📦 <b>Товар:</b> {ptype.upper()}\n"
+                    f"💵 <b>Сумма:</b> {amount}₽\n"
+                    f"🧾 <b>Транзакция:</b> <code>{transaction_id}</code>"
+                )
+                
+                await bot.send_message(ADMIN_CHANNEL, admin_text, parse_mode="HTML")
+                print(f"✅ Платёж подтверждён для user {user_id}, тип {ptype}")
+        
+        return web.Response(text="OK", status=200)
+    except Exception as e:
+        print(f"❌ Ошибка webhook: {e}")
+        return web.Response(text="Error", status=500)
+
+# ===== ЗАПУСК ВЕБ-СЕРВЕРА =====
+async def run_webhook_server():
+    app = web.Application()
+    app.router.add_post('/webhook/platega', platega_webhook)
+    
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, '0.0.0.0', 8081)
+    await site.start()
+    print("✅ Webhook сервер запущен на порту 8081")
+    
+    # Держим веб-сервер запущенным
+    await asyncio.Event().wait()
+
 # ===== ЗАПУСК =====
 async def main():
     from username_checker import ensure_client
@@ -1132,7 +1205,7 @@ async def main():
     logging.basicConfig(level=logging.INFO)
     
     print("=" * 50)
-    print("🤖 Бот запускается в режиме POLLING...")
+    print("🤖 Бот запускается...")
     print("🔍 TON Checker: API проверка активирована")
     print("👤 Username Checker: Telethon проверка в отдельном файле")
     print("🧹 Удаление сообщений: Включено")
@@ -1153,6 +1226,10 @@ async def main():
         print("⏳ Ожидаю сообщений...")
         print("=" * 50)
 
+        # 👇 ЗАПУСКАЕМ ВЕБ-СЕРВЕР В ФОНЕ
+        asyncio.create_task(run_webhook_server())
+        
+        # 👇 ЗАПУСКАЕМ POLLING (ОСНОВНОЙ БОТ)
         await dp.start_polling(bot, skip_updates=True)
 
     except Exception as e:
