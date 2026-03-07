@@ -1138,11 +1138,6 @@ async def sbp_payment(callback: CallbackQuery):
     user_id = callback.from_user.id
     parts = callback.data.split("_")
     
-    # 👇 ВРЕМЕННАЯ ОТЛАДКА
-    print(f"🔥 sbp_payment вызван с data: {callback.data}")
-    print(f"📦 parts: {parts}")
-    print(f"📦 len(parts): {len(parts)}")
-    
     if len(parts) >= 4:
         ptype = parts[1]
         recipient = parts[2]
@@ -1256,11 +1251,16 @@ async def paid_callback(callback: CallbackQuery):
 
 # ===== ЗАПУСК =====
 async def main():
-    # Подключаем Telethon при запуске бота
+    # 👇 СНАЧАЛА ПРИНУДИТЕЛЬНО УДАЛЯЕМ ВЕБХУК
+    try:
+        await bot.delete_webhook()
+        print("✅ Вебхук удалён")
+    except Exception as e:
+        print(f"⚠️ Ошибка при удалении вебхука: {e}")
+    
     from username_checker import ensure_client
     await ensure_client()
     print("✅ Telethon готов к работе")
-    logging.basicConfig(level=logging.INFO)
 
     print("=" * 50)
     print("🤖 Бот запускается...")
