@@ -1280,14 +1280,19 @@ async def start_web_server():
     await site.start()
     print("✅ Webhook сервер запущен на порту 8080")
 
-# ===== ЗАПУСК =====
 async def main():
-     # Запускаем webhook сервер
-    asyncio.create_task(start_web_server())
-    # Подключаем Telethon при запуске бота
+    # СНАЧАЛА удаляем вебхук (до всего остального)
+    try:
+        await bot.delete_webhook()
+        print("✅ Вебхук удалён")
+    except Exception as e:
+        print(f"⚠️ Ошибка при удалении вебхука: {e}")
+    
+    # Подключаем Telethon
     from username_checker import ensure_client
     await ensure_client()
     print("✅ Telethon готов к работе")
+    
     logging.basicConfig(level=logging.INFO)
 
     print("=" * 50)
@@ -1312,6 +1317,7 @@ async def main():
         print("⏳ Ожидаю сообщений...")
         print("=" * 50)
 
+        # Запускаем polling
         await dp.start_polling(bot, skip_updates=True)
 
     except Exception as e:
