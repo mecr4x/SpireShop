@@ -484,7 +484,7 @@ async def ton_cmd(message: Message, state: FSMContext):
 
     text = (
         f"<tg-emoji emoji-id=\"5438332129006081114\">💎</tg-emoji><b>TON</b>\n\n"
-        f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Курс к рублю:</b> {round(TON_RUB + 30, 2)}₽\n"
+        f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Курс к рублю:</b> {round(TON_RUB + 20, 2)}₽\n"
         f"<tg-emoji emoji-id=\"5447644880824181073\">⚠️</tg-emoji>️<b>Примечание:</b> TON поступает не на кошелек, а на Telegram аккаунт по @username."
         f"Использовать TON можно <b>только</b> в качестве покупки подарков на Telegram маркете, "
         f"а так же для оплаты за посты в Telegram каналах!\n\n"
@@ -596,7 +596,7 @@ async def ton_self_callback(callback: CallbackQuery):
     )
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="СБП", callback_data=f"sbp_ton_{formulaTON}", icon_custom_emoji_id =5305413839066525446)],
+        [InlineKeyboardButton(text="СБП", callback_data=f"sbp_ton_self_{formulaTON}", icon_custom_emoji_id =5305413839066525446)],
         [InlineKeyboardButton(text="CryptoBot", callback_data=f"crypto_ton_{formulaTON}",  icon_custom_emoji_id = 5361914370068613491)],
         [InlineKeyboardButton(text="❌Отмена", callback_data="ton")]
     ])
@@ -688,7 +688,7 @@ async def process_ton_friend(message: Message, state: FSMContext):
     )
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="СБП", callback_data=f"sbp_ton_{formulaTON}", icon_custom_emoji_id =5305413839066525446)],
+        [InlineKeyboardButton(text="СБП", callback_data=f"sbp_ton_friend_{formulaTON}", icon_custom_emoji_id =5305413839066525446)],
         [InlineKeyboardButton(text="CryptoBot", callback_data=f"crypto_ton_{formulaTON}",  icon_custom_emoji_id = 5361914370068613491)],
         [InlineKeyboardButton(text="❌Отмена", callback_data="ton")]
     ])
@@ -823,7 +823,7 @@ async def buy_premium_self_callback(callback: CallbackQuery):
         )
 
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="СБП", callback_data=f"sbp_premium_{priceprem}",icon_custom_emoji_id =5305413839066525446)],
+            [InlineKeyboardButton(text="СБП", callback_data=f"sbp_premium_self_{priceprem}",icon_custom_emoji_id =5305413839066525446)],
             [InlineKeyboardButton(text="Cryptobot", callback_data=f"crypto_premium_{round(priceprem /0.97,1)}",  icon_custom_emoji_id = 5361914370068613491)],
             [InlineKeyboardButton(text="❌Отмена", callback_data="premium")]
         ])
@@ -947,7 +947,7 @@ async def process_premium_friend(message: Message, state: FSMContext):
         )
 
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="СБП", callback_data=f"sbp_premium_{priceprem}", icon_custom_emoji_id = 5305413839066525446)],
+            [InlineKeyboardButton(text="СБП", callback_data=f"sbp_premium_friend_{priceprem}", icon_custom_emoji_id = 5305413839066525446)],
             [InlineKeyboardButton(text="Cryptobot", callback_data=f"crypto_premium_{round(priceprem /0.97,1)}",  icon_custom_emoji_id = 5361914370068613491)],
             [InlineKeyboardButton(text="❌Отмена", callback_data="premium")]
         ])
