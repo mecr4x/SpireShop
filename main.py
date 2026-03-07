@@ -1200,7 +1200,7 @@ async def sbp_payment(callback: CallbackQuery):
     )
     await delete_user_message(user_id, wait_msg.message_id)
 
-if result["success"]:
+  if result["success"]:
     text = (
         f"<tg-emoji emoji-id=\"5305413839066525446\">🏦</tg-emoji><b>Оплата по СБП</b>\n\n"
         f"{description}\n"
@@ -1208,19 +1208,17 @@ if result["success"]:
         f"<tg-emoji emoji-id=\"5274099962655816924\">❗️</tg-emoji><b>Комиссия:</b> 8%\n\n"
         f"👇 Нажмите кнопку для оплаты, а после подтвердите оплату нажав на \"<tg-emoji emoji-id=\"5206607081334906820\">✔️</tg-emoji>Оплатил\""
     )
-    
+
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="Оплатить", url=result["pay_url"], icon_custom_emoji_id=6030410254276106984)],
+        [InlineKeyboardButton(text="Оплатить", url=result["pay_url"])],
         [InlineKeyboardButton(text="Оплатил", callback_data=f"paid_{ptype}_{amount}_{username}", icon_custom_emoji_id=5206607081334906820)],
         [InlineKeyboardButton(text="❌Отмена", callback_data=ptype)]
     ])
-    
-        sent = await callback.message.answer(text, reply_markup=keyboard, parse_mode="HTML")
-        await save_and_delete_previous(user_id, sent.message_id)
-    else:
-        await callback.message.answer(f"❌ Ошибка: {result.get('error')}")
-    
-    await callback.answer()
+
+    sent = await callback.message.answer(text, reply_markup=keyboard, parse_mode="HTML")
+    await save_and_delete_previous(user_id, sent.message_id)
+else:
+    await callback.message.answer(f"❌ Ошибка: {result.get('error')}")
 
 # ===== КНОПКА "Я ОПЛАТИЛ" =====
 @router.callback_query(F.data.startswith("paid_"))
