@@ -21,8 +21,6 @@ from aiohttp import web
 import json
 import time
 
-# Хранилище обработанных транзакций (чтобы игнорировать дубликаты)
-processed_transactions = set()
 
 # ===== КОНФИГУРАЦИЯ =====
 BOT_TOKEN = "8236812443:AAGsoEmE7u9q5eBpKTQ3vlbp4IregP9-oHY"
@@ -1210,11 +1208,12 @@ async def sbp_payment(callback: CallbackQuery):
             f"{description}\n"
             f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Сумма:</b> {round(amount,1)}₽ (комиссия {round(amount - base_price, 1)}₽)\n"
             f"<tg-emoji emoji-id=\"5274099962655816924\">❗️</tg-emoji><b>Комиссия:</b> 8%\n\n"
-            f"👇Нажмите кнопку для оплаты"
+            f"👇Нажмите кнопку для оплаты, а после подтвердите оплату нажав на "<tg-emoji emoji-id=\"5206607081334906820\">✔️</tg-emoji>Оплатил""
         )
         
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="Оплатить", url=result["pay_url"])],
+            [InlineKeyboardButton(text="Оплатил", callback_data=f"paid_{ptype}_{amount}_{username}", icon_custom_emoji_id =5206607081334906820)],
             [InlineKeyboardButton(text="❌Отмена", callback_data=ptype)]
         ])
         
@@ -1225,65 +1224,42 @@ async def sbp_payment(callback: CallbackQuery):
     
     await callback.answer()
 
-# ===== WEBHOOK ДЛЯ PLATEGA =====
-async def platega_webhook(request):
-    """Принимает уведомления от Platega"""
-    try:
-        data = await request.json()
-        print(f"📩 Platega webhook: {data}")
-        
-        transaction_id = data.get('transactionId')
-        
-        # Игнорируем дубликаты
-        if transaction_id in processed_transactions:
-            return web.Response(text="OK", status=200)
-        
-        processed_transactions.add(transaction_id)
-        
-        # Очистка старых записей (раз в час)
-        if len(processed_transactions) > 1000:
-            processed_transactions.clear()
-        
-        # Проверяем статус платежа
-        if data.get('status') == 'SUCCESS':
-            payload = data.get('payload', '')
-            
-            # Извлекаем user_id из payload (формат: тип_userId_время)
-            if payload:
-                parts = payload.split('_')
-                if len(parts) >= 2:
-                    user_id = int(parts[1])
-                    ptype = parts[0]
-                    
-                    # Уведомляем пользователя
-                    await bot.send_message(
-                        user_id,
-                        f"✅ Оплата через СБП подтверждена!\nСпасибо за покупку!"
-                    )
-                    
-                    print(f"✅ Платёж подтверждён для user {user_id}, тип {ptype}")
-        
-        return web.Response(text="OK", status=200)
-        
-    except Exception as e:
-        print(f"❌ Ошибка webhook: {e}")
-        return web.Response(text="Error", status=500)
-
-# ===== ЗАПУСК WEB-СЕРВЕРА =====
-async def start_web_server():
-    app = web.Application()
-    app.router.add_post('/webhook/platega', platega_webhook)
+# ===== КНОПКА "Я ОПЛАТИЛ" =====
+@router.callback_query(F.data.startswith("paid_"))
+async def paid_callback(callback: CallbackQuery):
+    user_id = callback.from_user.id
+    parts = callback.data.split("_")
     
-    runner = web.AppRunner(app)
-    await runner.setup()
-    site = web.TCPSite(runner, '0.0.0.0', 8080)
-    await site.start()
-    print("✅ Webhook сервер запущен на порту 8080")
+    if len(parts) >= 3:
+        ptype = parts[1]
+        amount = parts[2]
+        username = parts[3] if len(parts) > 3 else callback.from_user.username or f"id{user_id}"
+        
+        # Благодарность пользователю
+        await callback.message.answer(
+            f"<b>Спасибо за покупку!</b>\n\n"
+            f"Администратор уже получил уведомление и скоро обработает заказ."
+            f"Ждем вас снова в SpireShop<tg-emoji emoji-id=\"5368469082867769478\">😘</tg-emoji>"
+        )
+        
+        # Уведомление админу
+        admin_text = (
+            f"💰 <b>НОВЫЙ ЗАКАЗ</b>\n\n"
+            f"👤 <b>Пользователь:</b> {username}\n"
+            f"📦 <b>Товар:</b> {ptype.upper()}\n"
+            f"💵 <b>Сумма:</b> {amount}₽\n"
+            f"⏱ <b>Время:</b> {time.strftime('%Y-%m-%d %H:%M:%S')}"
+        )
+        
+        await callback.bot.send_message(ADMIN_CHANNEL, admin_text, parse_mode="HTML")
+        
+        await callback.answer("✅ Заказ отправлен администратору")
+    else:
+        await callback.answer("❌ Ошибка данных", show_alert=True)
+
 
 # ===== ЗАПУСК =====
 async def main():
-     # Запускаем webhook сервер
-    asyncio.create_task(start_web_server())
     # Подключаем Telethon при запуске бота
     from username_checker import ensure_client
     await ensure_client()
