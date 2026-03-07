@@ -1285,11 +1285,9 @@ async def sbp_payment(callback: CallbackQuery):
     await bot.session.close()
     print("👋 Вебхук удалён")
 
-
 # ===== ЗАПУСК =====
-
 async def main():
-    # Подключаем Telethon
+    # Подключаем Telethon при запуске бота
     from username_checker import ensure_client
     await ensure_client()
     print("✅ Telethon готов к работе")
@@ -1315,17 +1313,15 @@ async def main():
         print("📋 Команды:")
         print("/start /menu /stars /ton /premium")
         print("=" * 50)
-        print("⏳ Ожидаю сообщений через вебхук...")
+        print("⏳ Ожидаю сообщений...")
         print("=" * 50)
 
-        # 👇 ЗДЕСЬ ДОЛЖЕН БЫТЬ КОД, КОТОРЫЙ ДЕРЖИТ БОТА ЗАПУЩЕННЫМ
-        await asyncio.Event().wait()
+        await dp.start_polling(bot, skip_updates=True)
 
     except Exception as e:
         print(f"❌ Ошибка запуска: {e}")
     finally:
         await bot.session.close()
-        print("👋 Бот остановлен")
 
 if __name__ == "__main__":
     asyncio.run(main())
