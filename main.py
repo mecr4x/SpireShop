@@ -1192,12 +1192,12 @@ async def sbp_payment(callback: CallbackQuery):
     platega_description = f"{ptype.upper()} {final_amount}₽"  # простой текст для API
 
 result = await create_platega_invoice(
-    amount_rub=final_amount,
-    description=platega_description,  # для Platega
-    order_id=order_id
-)
+        amount_rub=final_amount,
+        description=platega_description,
+        order_id=order_id
+    )
     
-    await delete_user_message(user_id, wait_msg.message_id)
+    await delete_user_message(user_id, wait_msg.message_id) 
 
     if result["success"]:
         text = (
