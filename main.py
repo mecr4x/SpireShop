@@ -1198,18 +1198,16 @@ async def sbp_payment(callback: CallbackQuery):
         description=description,
         order_id=order_id
     )
-    
     await delete_user_message(user_id, wait_msg.message_id)
-    
-    if result["success"]:
-        
+
+if result["success"]:
     text = (
-    f"<tg-emoji emoji-id=\"5305413839066525446\">🏦</tg-emoji><b>Оплата по СБП</b>\n\n"
-    f"{description}\n"
-    f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Сумма:</b> {round(amount,1)}₽ (комиссия {round(amount - base_price, 1)}₽)\n"
-    f"<tg-emoji emoji-id=\"5274099962655816924\">❗️</tg-emoji><b>Комиссия:</b> 8%\n\n"
-    f"👇 Нажмите кнопку для оплаты, а после подтвердите оплату нажав на \"<tg-emoji emoji-id=\"5206607081334906820\">✔️</tg-emoji>Оплатил\""
-)
+        f"<tg-emoji emoji-id=\"5305413839066525446\">🏦</tg-emoji><b>Оплата по СБП</b>\n\n"
+        f"{description}\n"
+        f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Сумма:</b> {round(amount,1)}₽ (комиссия {round(amount - base_price, 1)}₽)\n"
+        f"<tg-emoji emoji-id=\"5274099962655816924\">❗️</tg-emoji><b>Комиссия:</b> 8%\n\n"
+        f"👇 Нажмите кнопку для оплаты, а после подтвердите оплату нажав на \"<tg-emoji emoji-id=\"5206607081334906820\">✔️</tg-emoji>Оплатил\""
+    )
         
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="Оплатить", url=result["pay_url"])],
