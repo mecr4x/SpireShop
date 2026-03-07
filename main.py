@@ -1152,7 +1152,8 @@ async def sbp_payment(callback: CallbackQuery):
     stars_data = get_user_data(user_id, "stars")
     premium_data = get_user_data(user_id, "premium")
     ton_data = get_user_data(user_id, "ton_purchase")
-       # 👇 ПОЛУЧАЕМ USERNAME ЗДЕСЬ
+    
+    # 👇 ПОЛУЧАЕМ USERNAME
     username = callback.from_user.username
     if not username:
         username = f"id{user_id}"
@@ -1162,61 +1163,57 @@ async def sbp_payment(callback: CallbackQuery):
     # 👇 ГЛОБАЛЬНАЯ ПЕРЕМЕННАЯ КУРСА TON
     global TON_RUB
 
-     # 👇 ЗАДАЁМ НАЧАЛЬНЫЕ ЗНАЧЕНИЯ
-    commission = 0
+    # 👇 ЗАДАЁМ НАЧАЛЬНЫЕ ЗНАЧЕНИЯ
     description = f"Оплата {amount}₽"
+    base_price = amount  # значение по умолчанию
+    final_amount = amount
     
-    wait_msg = await callback.message.answer("Создаю ссылку для оплаты...")
-    
-    from username_checker import create_platega_invoice
-    
-    # Определяем описание и комиссию
+    # Определяем описание и разделяем цены
     if ptype == "stars" and stars_data:
         star_value = stars_data.get('star_value', '?')
         description = f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> {star_value} звёзд"
         base_price = round(star_value * 1.5, 1)  # твой доход
-        amount = round(base_price / 0.92, 1)
+        final_amount = round(base_price / 0.92, 1)  # клиент платит
 
     elif ptype == "premium" and premium_data:
         period = premium_data.get('period', 'Premium')
         description = f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> Telegram Premium на {period}"
         base_prices = {"12 месяцев": 2800, "6 месяцев": 1500, "3 месяца": 1200}
         base_price = base_prices.get(period, amount)
-        client_price = round(base_price / 0.92, 1)
-        amount = round(base_price / 0.92, 1)
+        final_amount = round(base_price / 0.92, 1)
 
     elif ptype == "ton" and ton_data:
         ton_value = ton_data.get('ton_value', '?')
         description = f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> {ton_value} TON"
-        base_price = round(ton_value * TON_RUB, 1)  # твой доход
-        amount = round(base_price / 0.92, 1) 
+        base_price = round(ton_value * TON_RUB, 1)
+        final_amount = round(base_price / 0.92, 1)
     
-    payload = f"{ptype}_{user_id}_{int(time.time())}"
     order_id = f"{ptype}_{user_id}_{int(time.time())}"
-     # 👇 ДАЛЬШЕ ИСПОЛЬЗУЕМ username
+    
     wait_msg = await callback.message.answer("Создаю ссылку для оплаты...")
     
     from username_checker import create_platega_invoice
     
     result = await create_platega_invoice(
-        amount_rub=amount,
+        amount_rub=final_amount,  # 👈 клиент платит эту сумму
         description=description,
         order_id=order_id
     )
+    
     await delete_user_message(user_id, wait_msg.message_id)
 
     if result["success"]:
         text = (
             f"<tg-emoji emoji-id=\"5305413839066525446\">🏦</tg-emoji><b>Оплата по СБП</b>\n\n"
             f"{description}\n"
-            f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Сумма:</b> {round(amount,1)}₽ (комиссия {round(amount - base_price, 1)}₽)\n"
-            f"<tg-emoji emoji-id=\"5274099962655816924\">❗️</tg-emoji><b>Комиссия:</b> 8%\n\n"
+            f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Сумма к оплате:</b> {round(final_amount,1)}₽ (комиссия {round(final_amount - base_price, 1)}₽)\n"
+            f"<tg-emoji emoji-id=\"5274099962655816924\">❗️</tg-emoji><b>Комиссия сервиса:</b> 8%\n\n"
             f"👇 Нажмите кнопку для оплаты, а после подтвердите оплату, нажав на \"<tg-emoji emoji-id=\"5206607081334906820\">✔️</tg-emoji>Оплатил\""
         )
 
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="Оплатить", url=result["pay_url"])],
-            [InlineKeyboardButton(text="Оплатил", callback_data=f"paid_{ptype}_{amount}_{username}", icon_custom_emoji_id=5206607081334906820)],
+            [InlineKeyboardButton(text="Оплатил", callback_data=f"paid_{ptype}_{final_amount}_{username}", icon_custom_emoji_id=5206607081334906820)],
             [InlineKeyboardButton(text="❌Отмена", callback_data=ptype)]
         ])
 
@@ -1224,7 +1221,8 @@ async def sbp_payment(callback: CallbackQuery):
         await save_and_delete_previous(user_id, sent.message_id)
     else:
         await callback.message.answer(f"❌ Ошибка: {result.get('error')}")
-
+    
+    await callback.answer()
 # ===== КНОПКА "Я ОПЛАТИЛ" =====
 @router.callback_query(F.data.startswith("paid_"))
 async def paid_callback(callback: CallbackQuery):
