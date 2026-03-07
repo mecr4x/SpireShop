@@ -236,7 +236,7 @@ async def process_stars_amount(message: Message, state: FSMContext):
             return
 
         # Расчет стоимости
-        formulastar = round(star_value * 1.7, 1)
+        formulastar = round(star_value * 1.5, 1)
 
         # Сохраняем данные
         save_user_data(message.from_user.id, "stars", {
@@ -532,7 +532,7 @@ async def process_ton_amount(message: Message, state: FSMContext):
             await delete_user_message(message.from_user.id, error_msg.message_id)
             return
 
-        formulaTON = round(ton_value * (TON_RUB + 30), 1)
+        formulaTON = round(ton_value * (TON_RUB + 20), 1)
 
         save_user_data(user_id, "ton_purchase", {
             'ton_value': ton_value,
@@ -733,9 +733,9 @@ async def premium_period_callback(callback: CallbackQuery, state: FSMContext):
     }
 
     prices = {
-        "premium_12": 3000,
-        "premium_6": 1700,
-        "premium_3": 1300
+        "premium_12": 2800,
+        "premium_6": 1500,
+        "premium_3": 1200
     }
 
     period = periods.get(callback.data, "3 месяца")
@@ -1007,13 +1007,13 @@ async def crypto_payment(callback: CallbackQuery):
     if ptype == "stars" and stars_data:
         star_value = stars_data.get('star_value', '?')
         description = f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> {star_value} звёзд"
-        base_price = round(star_value * 1.7, 1)
+        base_price = round(star_value * 1.5, 1)
         commission = round(amount - base_price, 1)
 
     elif ptype == "premium" and premium_data:
         period = premium_data.get('period', 'Premium')
         description = f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> Telegram Premium на {period}"
-        base_prices = {"12 месяцев":3000, "6 месяцев": 1700, "3 месяца": 1300}
+        base_prices = {"12 месяцев":2800, "6 месяцев": 1500, "3 месяца": 1200}
         base_price = base_prices.get(period, amount)
         commission = round(amount - base_price, 1)
 
@@ -1152,6 +1152,12 @@ async def sbp_payment(callback: CallbackQuery):
     stars_data = get_user_data(user_id, "stars")
     premium_data = get_user_data(user_id, "premium")
     ton_data = get_user_data(user_id, "ton_purchase")
+       # 👇 ПОЛУЧАЕМ USERNAME ЗДЕСЬ
+    username = callback.from_user.username
+    if not username:
+        username = f"id{user_id}"
+    else:
+        username = f"@{username}"
     
     # 👇 ГЛОБАЛЬНАЯ ПЕРЕМЕННАЯ КУРСА TON
     global TON_RUB
@@ -1168,13 +1174,13 @@ async def sbp_payment(callback: CallbackQuery):
     if ptype == "stars" and stars_data:
         star_value = stars_data.get('star_value', '?')
         description = f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> {star_value} звёзд"
-        base_price = round(star_value * 1.7, 1)  # твой доход
+        base_price = round(star_value * 1.5, 1)  # твой доход
         amount = round(base_price / 0.92, 1)
 
     elif ptype == "premium" and premium_data:
         period = premium_data.get('period', 'Premium')
         description = f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> Telegram Premium на {period}"
-        base_prices = {"12 месяцев": 3000, "6 месяцев": 1700, "3 месяца": 1300}
+        base_prices = {"12 месяцев": 2800, "6 месяцев": 1500, "3 месяца": 1200}
         base_price = base_prices.get(period, amount)
         client_price = round(base_price / 0.92, 1)
         amount = round(base_price / 0.92, 1)
@@ -1187,6 +1193,10 @@ async def sbp_payment(callback: CallbackQuery):
     
     payload = f"{ptype}_{user_id}_{int(time.time())}"
     order_id = f"{ptype}_{user_id}_{int(time.time())}"
+     # 👇 ДАЛЬШЕ ИСПОЛЬЗУЕМ username
+    wait_msg = await callback.message.answer("Создаю ссылку для оплаты...")
+    
+    from username_checker import create_platega_invoice
     
     result = await create_platega_invoice(
         amount_rub=amount,
@@ -1201,7 +1211,7 @@ async def sbp_payment(callback: CallbackQuery):
             f"{description}\n"
             f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Сумма:</b> {round(amount,1)}₽ (комиссия {round(amount - base_price, 1)}₽)\n"
             f"<tg-emoji emoji-id=\"5274099962655816924\">❗️</tg-emoji><b>Комиссия:</b> 8%\n\n"
-            f"👇 Нажмите кнопку для оплаты, а после подтвердите оплату нажав на \"<tg-emoji emoji-id=\"5206607081334906820\">✔️</tg-emoji>Оплатил\""
+            f"👇 Нажмите кнопку для оплаты, а после подтвердите оплату, нажав на \"<tg-emoji emoji-id=\"5206607081334906820\">✔️</tg-emoji>Оплатил\""
         )
 
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
