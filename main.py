@@ -1318,5 +1318,14 @@ async def main():
         print("⏳ Ожидаю сообщений через вебхук...")
         print("=" * 50)
 
+        # 👇 ЗДЕСЬ ДОЛЖЕН БЫТЬ КОД, КОТОРЫЙ ДЕРЖИТ БОТА ЗАПУЩЕННЫМ
+        await asyncio.Event().wait()
+
+    except Exception as e:
+        print(f"❌ Ошибка запуска: {e}")
+    finally:
+        await bot.session.close()
+        print("👋 Бот остановлен")
+
 if __name__ == "__main__":
     asyncio.run(main())
