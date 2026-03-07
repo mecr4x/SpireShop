@@ -1076,7 +1076,7 @@ async def sbp_payment(callback: CallbackQuery):
     description = f"Оплата {amount}₽"
     
     wait_msg = await callback.message.answer("Создаю ссылку для оплаты...")
-     from username_checker import create_platega_invoice
+    from username_checker import create_platega_invoice
     
     # Определяем описание и комиссию
     if ptype == "stars" and stars_data:
