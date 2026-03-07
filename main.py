@@ -24,7 +24,7 @@ import time
 
 # ===== КОНФИГУРАЦИЯ =====
 BOT_TOKEN = "8236812443:AAGsoEmE7u9q5eBpKTQ3vlbp4IregP9-oHY"
-ADMIN_CHANNEL = '@spireshop01'
+ADMIN_CHANNEL = '@spire_orders'
 SUPPORT_USERNAME = '@adamyan_ss'
 TON_WALLET = 'UQAL5Y75ykdUsMmW5FgnxKJyz1-njyS_oNuN1Lp2_hgNundO'
 
