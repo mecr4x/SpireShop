@@ -1191,14 +1191,13 @@ async def sbp_payment(callback: CallbackQuery):
     
     platega_description = f"{ptype.upper()} {final_amount}₽"  # простой текст для API
 
-result = await create_platega_invoice(
+    result = await create_platega_invoice(  # ← 4 пробела
         amount_rub=final_amount,
         description=platega_description,
         order_id=order_id
     )
     
-    await delete_user_message(user_id, wait_msg.message_id) 
-
+    await delete_user_message(user_id, wait_msg.message_id)  # ← тоже 4 пробела
     if result["success"]:
         text = (
             f"<tg-emoji emoji-id=\"5305413839066525446\">🏦</tg-emoji><b>Оплата по СБП</b>\n\n"
