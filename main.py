@@ -1,9 +1,8 @@
-## main.py - ПОЛНАЯ РАБОЧАЯ ВЕРСИЯ
+## main.py - ТОЛЬКО POLLING
 import sys
 import asyncio
 import logging
 import time
-import json
 
 # Для Windows
 if sys.platform == 'win32':
@@ -17,19 +16,12 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.client.default import DefaultBotProperties
-from aiohttp import web
-from aiogram.webhook.aiohttp_server import SimpleRequestHandler
 
 # ===== КОНФИГУРАЦИЯ =====
 BOT_TOKEN = "8236812443:AAGsoEmE7u9q5eBpKTQ3vlbp4IregP9-oHY"
 ADMIN_CHANNEL = '@spireshop01'
 SUPPORT_USERNAME = '@adamyan_ss'
 TON_WALLET = 'UQAL5Y75ykdUsMmW5FgnxKJyz1-njyS_oNuN1Lp2_hgNundO'
-
-# ===== НАСТРОЙКИ ВЕБХУКА =====
-WEBHOOK_HOST = "https://01kjwz01sk1rp562fdxzfjfw5v.hooks.webhookrelay.com"
-WEBHOOK_PATH = "/webhook/aiogram"
-WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
 
 # ===== ИНИЦИАЛИЗАЦИЯ =====
 bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode="HTML"))
@@ -39,11 +31,10 @@ dp.include_router(router)
 
 # ===== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ =====
 TON_RUB = 140
-processed_transactions = set()
 user_messages = {}
 user_data = {}
 
-# ===== ХРАНИЛИЩЕ ДЛЯ УДАЛЕНИЯ СООБЩЕНИЙ =====
+# ===== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ =====
 async def save_and_delete_previous(user_id: int, new_message_id: int):
     if user_id not in user_messages:
         user_messages[user_id] = []
@@ -1132,74 +1123,7 @@ async def sbp_payment(callback: CallbackQuery):
     
     await callback.answer()
 
-# ===== ВЕБХУК ДЛЯ PLATEGA =====
-async def platega_webhook(request: web.Request) -> web.Response:
-    try:
-        data = await request.json()
-        print(f"📩 Platega webhook: {json.dumps(data, indent=2)}")
-        
-        transaction_id = data.get('transactionId')
-        status = data.get('status')
-        payload = data.get('payload', '')
-        
-        if transaction_id in processed_transactions:
-            return web.Response(text="OK", status=200)
-        processed_transactions.add(transaction_id)
-        
-        if status == 'SUCCESS' and payload:
-            parts = payload.split('_')
-            if len(parts) >= 2:
-                user_id = int(parts[1])
-                ptype = parts[0]
-                amount = data.get('paymentDetails', {}).get('amount', 0)
-                
-                username = "неизвестно"
-                try:
-                    user = await bot.get_chat(user_id)
-                    username = user.username or f"id{user_id}"
-                except:
-                    username = f"id{user_id}"
-                
-                await bot.send_message(
-                    user_id,
-                    f"✅ <b>Оплата подтверждена!</b>\n\n"
-                    f"Спасибо за покупку!\n"
-                    f"Товар: {ptype.upper()}\n"
-                    f"Сумма: {amount}₽\n\n"
-                    f"/menu — вернуться в меню"
-                )
-                
-                admin_text = (
-                    f"💰 <b>Новый платёж!</b>\n\n"
-                    f"👤 <b>Пользователь:</b> @{username}\n"
-                    f"🆔 <b>ID:</b> <code>{user_id}</code>\n"
-                    f"📦 <b>Товар:</b> {ptype.upper()}\n"
-                    f"💵 <b>Сумма:</b> {amount}₽\n"
-                    f"🧾 <b>Транзакция:</b> <code>{transaction_id}</code>"
-                )
-                
-                await bot.send_message(ADMIN_CHANNEL, admin_text, parse_mode="HTML")
-                print(f"✅ Платёж подтверждён для user {user_id}, тип {ptype}")
-        
-        return web.Response(text="OK", status=200)
-    except Exception as e:
-        print(f"❌ Ошибка webhook: {e}")
-        return web.Response(text="Error", status=500)
-
 # ===== ЗАПУСК =====
-async def on_startup():
-    await bot.set_webhook(
-        url=WEBHOOK_URL,
-        allowed_updates=["message", "callback_query"],
-        drop_pending_updates=True
-    )
-    print(f"✅ Вебхук установлен: {WEBHOOK_URL}")
-
-async def on_shutdown():
-    await bot.delete_webhook()
-    await bot.session.close()
-    print("👋 Вебхук удалён")
-
 async def main():
     from username_checker import ensure_client
     await ensure_client()
@@ -1208,7 +1132,7 @@ async def main():
     logging.basicConfig(level=logging.INFO)
     
     print("=" * 50)
-    print("🤖 Бот запускается...")
+    print("🤖 Бот запускается в режиме POLLING...")
     print("🔍 TON Checker: API проверка активирована")
     print("👤 Username Checker: Telethon проверка в отдельном файле")
     print("🧹 Удаление сообщений: Включено")
@@ -1226,27 +1150,15 @@ async def main():
         print("📋 Команды:")
         print("/start /menu /stars /ton /premium")
         print("=" * 50)
-        print("⏳ Ожидаю сообщений через вебхук...")
+        print("⏳ Ожидаю сообщений...")
         print("=" * 50)
 
-        await on_startup()
-
-        app = web.Application()
-        app.router.add_post('/webhook/platega', platega_webhook)
-        SimpleRequestHandler(dispatcher=dp, bot=bot).register(app, path=WEBHOOK_PATH)
-        
-        runner = web.AppRunner(app)
-        await runner.setup()
-        site = web.TCPSite(runner, '0.0.0.0', 8080)
-        await site.start()
-        print("✅ Веб-сервер запущен на порту 8080")
-        
-        await asyncio.Event().wait()
+        await dp.start_polling(bot, skip_updates=True)
 
     except Exception as e:
         print(f"❌ Ошибка запуска: {e}")
     finally:
-        await on_shutdown()
+        await bot.session.close()
 
 if __name__ == "__main__":
     asyncio.run(main())
