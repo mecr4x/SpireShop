@@ -1249,7 +1249,7 @@ async def sbp_payment(callback: CallbackQuery):
     if ptype == "stars" and stars_data:
         star_value = stars_data.get('star_value', '?')
         description = f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> {star_value} звёзд"
-        base_price = round(star_value * 1.5, 1)  # ТВОЯ ЦЕНА: 1.7 за звезду
+        base_price = round(star_value * 1.5, 1)
         final_amount = round(base_price / 0.92, 1)
 
     elif ptype == "premium" and premium_data:
@@ -1258,7 +1258,6 @@ async def sbp_payment(callback: CallbackQuery):
         print(f"👑 Premium данные: period={period}, priceprem={priceprem}")
         
         description = f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> Telegram Premium на {period}"
-        # ТВОИ ЦЕНЫ
         base_prices = {
             "12 месяцев": 2800,
             "6 месяцев": 1500, 
@@ -1270,16 +1269,15 @@ async def sbp_payment(callback: CallbackQuery):
     elif ptype == "ton" and ton_data:
         ton_value = ton_data.get('ton_value', '?')
         description = f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> {ton_value} TON"
-        base_price = round(ton_value * (TON_RUB + 20), 1)  # ТВОЙ КУРС: TON_RUB + 30
+        base_price = round(ton_value * (TON_RUB + 20), 1)
         final_amount = round(base_price / 0.92, 1)
     
-       order_id = f"{ptype}_{user_id}_{int(time.time())}"
+    order_id = f"{ptype}_{user_id}_{int(time.time())}"
     
     wait_msg = await callback.message.answer("Создаю ссылку для оплаты...")
     
     from username_checker import create_platega_invoice
     
-    # Простое описание для Platega (без эмодзи)
     platega_description = f"{ptype.upper()} {round(final_amount,1)}₽"
     
     result = await create_platega_invoice(
