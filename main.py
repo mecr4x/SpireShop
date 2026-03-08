@@ -1288,9 +1288,9 @@ async def sbp_payment(callback: CallbackQuery):
         order_id=order_id
     )
     
-    await delete_user_message(user_id, wait_msg.message_id)
+   await delete_user_message(user_id, wait_msg.message_id)
 
-   if result["success"]:
+    if result["success"]:  # ← этот отступ должен совпадать с предыдущей строкой
     # Определяем количество для передачи
     if ptype == "stars" and stars_data:
         quantity = stars_data.get('star_value', '?')
