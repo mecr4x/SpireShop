@@ -24,7 +24,7 @@ import time
 
 # ===== КОНФИГУРАЦИЯ =====
 BOT_TOKEN = "8236812443:AAGsoEmE7u9q5eBpKTQ3vlbp4IregP9-oHY"
-ADMIN_CHANNEL = '@spire_orders'
+ADMIN_ID = 887261650
 SUPPORT_USERNAME = '@adamyan_ss'
 TON_WALLET = 'UQAL5Y75ykdUsMmW5FgnxKJyz1-njyS_oNuN1Lp2_hgNundO'
 
@@ -1268,7 +1268,7 @@ async def paid_callback(callback: CallbackQuery):
         
         # 👇 ОТПРАВЛЯЕМ ТЕБЕ В ЛИЧКУ
         await callback.bot.send_message(
-            chat_id=887261650,  # твой Telegram ID (число)
+            chat_id=ADMIN_ID,  # твой Telegram ID (число)
             text=order_text,
             parse_mode="HTML"
         )
