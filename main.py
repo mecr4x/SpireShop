@@ -1344,22 +1344,24 @@ async def sbp_payment(callback: CallbackQuery):
 # ===== КНОПКА "Я ОПЛАТИЛ" =====
 @router.callback_query(F.data.startswith("paid_"))
 async def paid_callback(callback: CallbackQuery):
+    # 👇 ПРОВЕРКА ПОДПИСКИ
     if not await require_subscription_callback(callback):
         return
     
     user_id = callback.from_user.id
     parts = callback.data.split("_")
     
-        if len(parts) >= 5:
-        ptype = parts[1]
-        quantity = parts[2]
-        amount = parts[3]
-        recipient = parts[4]
+    # Формат: paid_тип_количество_сумма_получатель
+    if len(parts) >= 5:
+        ptype = parts[1]           # stars, premium, ton
+        quantity = parts[2]         # количество (100, 12, 5)
+        amount = parts[3]           # сумма (163)
+        recipient = parts[4]        # получатель (@username)
 
         # Если username содержит подчеркивания, объединяем остальные части
         if len(parts) > 5:
-            recipient = "_".join(parts[4:])  # 👈 ИСПРАВЛЕНО
-        
+            recipient = "_".join(parts[4:])
+
         await delete_user_message(user_id, callback.message.message_id)
         
         # Название товара на русском
