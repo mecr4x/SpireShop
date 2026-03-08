@@ -17,7 +17,6 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.client.default import DefaultBotProperties
-from aiogram.filters import StateFilter
 from aiohttp import web
 import json
 import time
@@ -113,7 +112,6 @@ class Form(StatesGroup):
     waiting_for_ton_amount = State()  # 👈 ЭТО ДОЛЖНО БЫТЬ
     waiting_for_ton_friend_username = State()
     waiting_for_premium_friend = State()
-    waiting_broadcast_text = State()
 
 
 # ===== ХРАНИЛИЩЕ ДАННЫХ =====
