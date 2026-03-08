@@ -17,10 +17,10 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.client.default import DefaultBotProperties
+from aiogram.filters import StateFilter
 from aiohttp import web
 import json
 import time
-
 
 # ===== КОНФИГУРАЦИЯ =====
 BOT_TOKEN = "8236812443:AAGsoEmE7u9q5eBpKTQ3vlbp4IregP9-oHY"
@@ -42,17 +42,22 @@ TON_RUB = 140
 user_ids = set()  # множество для хранения ID всех пользователей
 admin_commands = {}  # для хранения временных данных
 
+
 # ===== СОХРАНЕНИЕ ВСЕХ ПОЛЬЗОВАТЕЛЕЙ =====
 @router.message()
 async def save_all_users(message: Message):
     user_ids.add(message.from_user.id)
 
+
 @router.callback_query()
 async def save_all_users_callback(callback: CallbackQuery):
     user_ids.add(callback.from_user.id)
 
+
 # ===== ХРАНИЛИЩЕ ДЛЯ УДАЛЕНИЯ СООБЩЕНИЙ =====
 user_messages = {}
+
+
 async def save_and_delete_previous(user_id: int, new_message_id: int):
     """Сохранить новое сообщение и удалить старое"""
     if user_id not in user_messages:
@@ -93,6 +98,7 @@ async def check_subscription(user_id: int) -> bool:
     except:
         return False
 
+
 async def require_subscription_callback(callback: CallbackQuery) -> bool:
     """Проверяет подписку и показывает всплывающее окно если нет"""
     if not await check_subscription(callback.from_user.id):
@@ -112,6 +118,7 @@ class Form(StatesGroup):
     waiting_for_ton_amount = State()  # 👈 ЭТО ДОЛЖНО БЫТЬ
     waiting_for_ton_friend_username = State()
     waiting_for_premium_friend = State()
+    waiting_broadcast_text = State()
 
 
 # ===== ХРАНИЛИЩЕ ДАННЫХ =====
@@ -127,6 +134,7 @@ def save_user_data(user_id, key, value):
 def get_user_data(user_id, key):
     return user_data.get(user_id, {}).get(key)
 
+
 async def get_ton_price():
     """Получение курса TON"""
     try:
@@ -139,6 +147,7 @@ async def get_ton_price():
                 return data['the-open-network']['rub']
     except:
         return 140
+
 
 # ===== КОМАНДА /START =====
 @router.message(Command("start"))
@@ -184,12 +193,14 @@ async def check_sub(callback: CallbackQuery):
 @router.message(Command("menu"))
 async def menu_cmd(message: Message):
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="Купить звёзды", callback_data="stars", icon_custom_emoji_id = 5438391541288689158)],
-        [InlineKeyboardButton(text="Пополнить TON", callback_data="ton", icon_custom_emoji_id = 5438332129006081114)],
-        [InlineKeyboardButton(text="Купить Premium", callback_data="premium", icon_custom_emoji_id =5402352097045795954)],
+        [InlineKeyboardButton(text="Купить звёзды", callback_data="stars", icon_custom_emoji_id=5438391541288689158)],
+        [InlineKeyboardButton(text="Пополнить TON", callback_data="ton", icon_custom_emoji_id=5438332129006081114)],
+        [InlineKeyboardButton(text="Купить Premium", callback_data="premium",
+                              icon_custom_emoji_id=5402352097045795954)],
         [
-            InlineKeyboardButton(text="Поддержка", url=f"https://t.me/{SUPPORT_USERNAME[1:]}", icon_custom_emoji_id = 6021798595739523148),
-            InlineKeyboardButton(text="Информация", callback_data="info", icon_custom_emoji_id = 5258503720928288433)
+            InlineKeyboardButton(text="Поддержка", url=f"https://t.me/{SUPPORT_USERNAME[1:]}",
+                                 icon_custom_emoji_id=6021798595739523148),
+            InlineKeyboardButton(text="Информация", callback_data="info", icon_custom_emoji_id=5258503720928288433)
         ]
     ])
 
@@ -208,17 +219,21 @@ async def info_callback(callback: CallbackQuery, state: FSMContext):
     # 👇 ПРОВЕРКА ПОДПИСКИ
     if not await require_subscription_callback(callback):
         return
-    
+
     await state.clear()
-    
+
     text = (
         "<tg-emoji emoji-id=\"5258503720928288433\">ℹ️</tg-emoji><b>Информация</b>\n\n"
         "Здесь вы можете ознакомиться с важными документами сервиса:"
     )
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="Политика конфиденциальности", url="https://telegra.ph/Politika-konfidencialnosti-03-03-42", icon_custom_emoji_id=6021741567163767583)],
-        [InlineKeyboardButton(text="Пользовательское соглашение", url="https://telegra.ph/Polzovatelskoe-soglashenie-03-03-16", icon_custom_emoji_id=6021741567163767583)],
+        [InlineKeyboardButton(text="Политика конфиденциальности",
+                              url="https://telegra.ph/Politika-konfidencialnosti-03-03-42",
+                              icon_custom_emoji_id=6021741567163767583)],
+        [InlineKeyboardButton(text="Пользовательское соглашение",
+                              url="https://telegra.ph/Polzovatelskoe-soglashenie-03-03-16",
+                              icon_custom_emoji_id=6021741567163767583)],
         [InlineKeyboardButton(text=" Назад", callback_data="back_to_menu")],
     ])
     # Отправляем сообщение
@@ -227,10 +242,11 @@ async def info_callback(callback: CallbackQuery, state: FSMContext):
         sent_message = await callback.message.answer_photo(photo=photo, caption=text, reply_markup=keyboard)
     except:
         sent_message = await callback.message.answer(text, reply_markup=keyboard)
-    
+
     await save_and_delete_previous(callback.from_user.id, sent_message.message_id)
     await callback.answer()
-    
+
+
 # ===== КОМАНДА /STARS =====
 @router.message(Command("stars"))
 async def stars_cmd(message: Message, state: FSMContext):
@@ -254,7 +270,6 @@ async def stars_cmd(message: Message, state: FSMContext):
         sent_message = await message.answer(text, reply_markup=keyboard)
 
     await save_and_delete_previous(message.from_user.id, sent_message.message_id)
-    await delete_user_message(user_id, callback.message.message_id)
     await state.set_state(Form.waiting_for_stars_amount)
 
 
@@ -291,8 +306,10 @@ async def process_stars_amount(message: Message, state: FSMContext):
         )
 
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="Купить себе", callback_data="buy_stars_self", icon_custom_emoji_id = 5406604187683270743)],
-            [InlineKeyboardButton(text="Подарить другу", callback_data="gift_stars_friend", icon_custom_emoji_id=5203996991054432397)],
+            [InlineKeyboardButton(text="Купить себе", callback_data="buy_stars_self",
+                                  icon_custom_emoji_id=5406604187683270743)],
+            [InlineKeyboardButton(text="Подарить другу", callback_data="gift_stars_friend",
+                                  icon_custom_emoji_id=5203996991054432397)],
             [InlineKeyboardButton(text="Назад", callback_data="stars")]
         ])
 
@@ -310,13 +327,14 @@ async def process_stars_amount(message: Message, state: FSMContext):
         await asyncio.sleep(2)
         await delete_user_message(message.from_user.id, error_msg.message_id)
 
+
 # ===== КНОПКА "КУПИТЬ СЕБЕ" =====
 @router.callback_query(F.data == "buy_stars_self")
 async def buy_stars_self_callback(callback: CallbackQuery):
     # 👇 ПРОВЕРКА ПОДПИСКИ
     if not await require_subscription_callback(callback):
         return
-    
+
     user_id = callback.from_user.id
     stars_data = get_user_data(user_id, "stars")
 
@@ -361,8 +379,10 @@ async def buy_stars_self_callback(callback: CallbackQuery):
     )
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="СБП", callback_data=f"sbp_stars_self_{formulastar}", icon_custom_emoji_id =5305413839066525446)],
-        [InlineKeyboardButton(text="Cryptobot", callback_data=f"crypto_stars_{round (formulastar /0.97,1)}", icon_custom_emoji_id = 5361914370068613491)],
+        [InlineKeyboardButton(text="СБП", callback_data=f"sbp_stars_self_{formulastar}",
+                              icon_custom_emoji_id=5305413839066525446)],
+        [InlineKeyboardButton(text="Cryptobot", callback_data=f"crypto_stars_{round(formulastar / 0.97, 1)}",
+                              icon_custom_emoji_id=5361914370068613491)],
         [InlineKeyboardButton(text="❌Отмена", callback_data="back_to_stars_choice")]
     ])
 
@@ -374,13 +394,14 @@ async def buy_stars_self_callback(callback: CallbackQuery):
     await save_and_delete_previous(user_id, sent_message.message_id)
     await callback.answer()
 
+
 # ===== КНОПКА "ПОДАРИТЬ ДРУГУ" =====
 @router.callback_query(F.data == "gift_stars_friend")
 async def gift_stars_friend_callback(callback: CallbackQuery, state: FSMContext):
     # 👇 ПРОВЕРКА ПОДПИСКИ
     if not await require_subscription_callback(callback):
         return
-    
+
     user_id = callback.from_user.id
     stars_data = get_user_data(user_id, "stars")
 
@@ -418,7 +439,7 @@ async def back_to_stars_choice_callback(callback: CallbackQuery):
     # 👇 ПРОВЕРКА ПОДПИСКИ
     if not await require_subscription_callback(callback):
         return
-    
+
     user_id = callback.from_user.id
     stars_data = get_user_data(user_id, "stars")
 
@@ -438,8 +459,10 @@ async def back_to_stars_choice_callback(callback: CallbackQuery):
     )
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="Купить себе", callback_data="buy_stars_self", icon_custom_emoji_id =5305413839066525446)],
-        [InlineKeyboardButton(text="Подарить другу", callback_data="gift_stars_friend", icon_custom_emoji_id=5203996991054432397)],
+        [InlineKeyboardButton(text="Купить себе", callback_data="buy_stars_self",
+                              icon_custom_emoji_id=5305413839066525446)],
+        [InlineKeyboardButton(text="Подарить другу", callback_data="gift_stars_friend",
+                              icon_custom_emoji_id=5203996991054432397)],
         [InlineKeyboardButton(text="Назад", callback_data="stars")]
     ])
 
@@ -510,8 +533,10 @@ async def process_friend_username(message: Message, state: FSMContext):
     )
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="СБП", callback_data=f"sbp_stars_friend_{formulastar}", icon_custom_emoji_id = 5305413839066525446)],
-        [InlineKeyboardButton(text="Cryptobot", callback_data=f"crypto_stars_friend_{round (formulastar /0.97,1)}", icon_custom_emoji_id = 5361914370068613491)],
+        [InlineKeyboardButton(text="СБП", callback_data=f"sbp_stars_friend_{formulastar}",
+                              icon_custom_emoji_id=5305413839066525446)],
+        [InlineKeyboardButton(text="Cryptobot", callback_data=f"crypto_stars_friend_{round(formulastar / 0.97, 1)}",
+                              icon_custom_emoji_id=5361914370068613491)],
         [InlineKeyboardButton(text="❌Отмена", callback_data="back_to_stars_choice")]
     ])
 
@@ -554,10 +579,10 @@ async def ton_cmd(message: Message, state: FSMContext):
         sent_message = await message.answer(text, reply_markup=keyboard)
 
     await save_and_delete_previous(message.from_user.id, sent_message.message_id)
-    await delete_user_message(user_id, callback.message.message_id)
     await state.set_state(Form.waiting_for_ton_amount)
 
-#======ОБРАБОТКА СУММЫ ТОН======
+
+# ======ОБРАБОТКА СУММЫ ТОН======
 @router.message(Form.waiting_for_ton_amount)
 async def process_ton_amount(message: Message, state: FSMContext):
     user_id = message.from_user.id
@@ -599,8 +624,10 @@ async def process_ton_amount(message: Message, state: FSMContext):
         )
 
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="Купить себе", callback_data="buy_ton_self", icon_custom_emoji_id = 5406604187683270743)],
-            [InlineKeyboardButton(text="Подарить другу", callback_data="gift_ton_friend", icon_custom_emoji_id=5203996991054432397)],
+            [InlineKeyboardButton(text="Купить себе", callback_data="buy_ton_self",
+                                  icon_custom_emoji_id=5406604187683270743)],
+            [InlineKeyboardButton(text="Подарить другу", callback_data="gift_ton_friend",
+                                  icon_custom_emoji_id=5203996991054432397)],
             [InlineKeyboardButton(text="Назад", callback_data="ton")]
         ])
 
@@ -625,7 +652,7 @@ async def ton_self_callback(callback: CallbackQuery):
     # 👇 ПРОВЕРКА ПОДПИСКИ
     if not await require_subscription_callback(callback):
         return
-    
+
     user_id = callback.from_user.id
     data = get_user_data(user_id, "ton_purchase")
 
@@ -652,13 +679,15 @@ async def ton_self_callback(callback: CallbackQuery):
     )
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="СБП", callback_data=f"sbp_ton_self_{formulaTON}", icon_custom_emoji_id =5305413839066525446)],
-        [InlineKeyboardButton(text="CryptoBot", callback_data=f"crypto_ton_{formulaTON}",  icon_custom_emoji_id = 5361914370068613491)],
+        [InlineKeyboardButton(text="СБП", callback_data=f"sbp_ton_self_{formulaTON}",
+                              icon_custom_emoji_id=5305413839066525446)],
+        [InlineKeyboardButton(text="CryptoBot", callback_data=f"crypto_ton_{formulaTON}",
+                              icon_custom_emoji_id=5361914370068613491)],
         [InlineKeyboardButton(text="❌Отмена", callback_data="ton")]
     ])
 
     try:
-        sent = await callback.message.answer_photo( caption=text, reply_markup=keyboard)
+        sent = await callback.message.answer_photo(caption=text, reply_markup=keyboard)
     except:
         sent = await callback.message.answer(text, reply_markup=keyboard)
 
@@ -672,7 +701,7 @@ async def ton_friend_callback(callback: CallbackQuery, state: FSMContext):
     # 👇 ПРОВЕРКА ПОДПИСКИ
     if not await require_subscription_callback(callback):
         return
-    
+
     user_id = callback.from_user.id
     data = get_user_data(user_id, "ton_purchase")
 
@@ -695,7 +724,7 @@ async def ton_friend_callback(callback: CallbackQuery, state: FSMContext):
     ])
 
     try:
-        sent = await callback.message.answer_photo( caption=text, reply_markup=keyboard)
+        sent = await callback.message.answer_photo(caption=text, reply_markup=keyboard)
     except:
         sent = await callback.message.answer(text, reply_markup=keyboard)
 
@@ -748,18 +777,21 @@ async def process_ton_friend(message: Message, state: FSMContext):
     )
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="СБП", callback_data=f"sbp_ton_friend_{formulaTON}", icon_custom_emoji_id =5305413839066525446)],
-        [InlineKeyboardButton(text="CryptoBot", callback_data=f"crypto_ton_{formulaTON}",  icon_custom_emoji_id = 5361914370068613491)],
+        [InlineKeyboardButton(text="СБП", callback_data=f"sbp_ton_friend_{formulaTON}",
+                              icon_custom_emoji_id=5305413839066525446)],
+        [InlineKeyboardButton(text="CryptoBot", callback_data=f"crypto_ton_{formulaTON}",
+                              icon_custom_emoji_id=5361914370068613491)],
         [InlineKeyboardButton(text="❌Отмена", callback_data="ton")]
     ])
 
     try:
-        sent = await message.answer_photo (caption=text, reply_markup=keyboard)
+        sent = await message.answer_photo(caption=text, reply_markup=keyboard)
     except:
         sent = await message.answer(text, reply_markup=keyboard)
 
     await save_and_delete_previous(user_id, sent.message_id)
     await state.clear()
+
 
 # ===== КОМАНДА /PREMIUM =====
 @router.message(Command("premium"))
@@ -789,7 +821,7 @@ async def premium_period_callback(callback: CallbackQuery, state: FSMContext):
     # 👇 ПРОВЕРКА ПОДПИСКИ
     if not await require_subscription_callback(callback):
         return
-    
+
     periods = {
         "premium_12": "12 месяцев",
         "premium_6": "6 месяцев",
@@ -818,8 +850,10 @@ async def premium_period_callback(callback: CallbackQuery, state: FSMContext):
     )
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="Купить себе", callback_data="buy_premium_self", icon_custom_emoji_id =5406604187683270743)],
-        [InlineKeyboardButton(text="Подарить другу", callback_data="gift_premium_friend", icon_custom_emoji_id =5203996991054432397)],
+        [InlineKeyboardButton(text="Купить себе", callback_data="buy_premium_self",
+                              icon_custom_emoji_id=5406604187683270743)],
+        [InlineKeyboardButton(text="Подарить другу", callback_data="gift_premium_friend",
+                              icon_custom_emoji_id=5203996991054432397)],
         [InlineKeyboardButton(text="Назад", callback_data="menu")]
     ])
 
@@ -831,13 +865,14 @@ async def premium_period_callback(callback: CallbackQuery, state: FSMContext):
     await save_and_delete_previous(callback.from_user.id, sent_message.message_id)
     await callback.answer()
 
+
 # ===== КНОПКА "КУПИТЬ PREMIUM СЕБЕ" =====
 @router.callback_query(F.data == "buy_premium_self")
 async def buy_premium_self_callback(callback: CallbackQuery):
     # 👇 ПРОВЕРКА ПОДПИСКИ
     if not await require_subscription_callback(callback):
         return
-    
+
     user_id = callback.from_user.id
     premium_data = get_user_data(user_id, "premium")
 
@@ -871,7 +906,8 @@ async def buy_premium_self_callback(callback: CallbackQuery):
         )
 
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="Подарить другу", callback_data="gift_premium_friend", icon_custom_emoji_id = 5203996991054432397)],
+            [InlineKeyboardButton(text="Подарить другу", callback_data="gift_premium_friend",
+                                  icon_custom_emoji_id=5203996991054432397)],
             [InlineKeyboardButton(text="Назад", callback_data="premium")]
         ])
 
@@ -891,8 +927,10 @@ async def buy_premium_self_callback(callback: CallbackQuery):
         )
 
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="СБП", callback_data=f"sbp_premium_self_{priceprem}",icon_custom_emoji_id =5305413839066525446)],
-            [InlineKeyboardButton(text="Cryptobot", callback_data=f"crypto_premium_{round(priceprem /0.97,1)}",  icon_custom_emoji_id = 5361914370068613491)],
+            [InlineKeyboardButton(text="СБП", callback_data=f"sbp_premium_self_{priceprem}",
+                                  icon_custom_emoji_id=5305413839066525446)],
+            [InlineKeyboardButton(text="Cryptobot", callback_data=f"crypto_premium_{round(priceprem / 0.97, 1)}",
+                                  icon_custom_emoji_id=5361914370068613491)],
             [InlineKeyboardButton(text="❌Отмена", callback_data="premium")]
         ])
 
@@ -904,13 +942,14 @@ async def buy_premium_self_callback(callback: CallbackQuery):
     await save_and_delete_previous(user_id, sent_message.message_id)
     await callback.answer()
 
+
 # ===== КНОПКА "ПОДАРИТЬ PREMIUM ДРУГУ" =====
 @router.callback_query(F.data == "gift_premium_friend")
 async def gift_premium_friend_callback(callback: CallbackQuery, state: FSMContext):
     # 👇 ПРОВЕРКА ПОДПИСКИ
     if not await require_subscription_callback(callback):
         return
-    
+
     user_id = callback.from_user.id
     premium_data = get_user_data(user_id, "premium")
 
@@ -933,7 +972,7 @@ async def gift_premium_friend_callback(callback: CallbackQuery, state: FSMContex
     ])
 
     try:
-        sent_message = await callback.message.answer_photo (caption=text, reply_markup=keyboard)
+        sent_message = await callback.message.answer_photo(caption=text, reply_markup=keyboard)
     except:
         sent_message = await callback.message.answer(text, reply_markup=keyboard)
 
@@ -1004,7 +1043,7 @@ async def process_premium_friend(message: Message, state: FSMContext):
 
         try:
 
-            sent_message = await message.answer_photo( caption=text, reply_markup=keyboard)
+            sent_message = await message.answer_photo(caption=text, reply_markup=keyboard)
         except:
             sent_message = await message.answer(text, reply_markup=keyboard)
 
@@ -1019,8 +1058,10 @@ async def process_premium_friend(message: Message, state: FSMContext):
         )
 
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="СБП", callback_data=f"sbp_premium_friend_{priceprem}", icon_custom_emoji_id = 5305413839066525446)],
-            [InlineKeyboardButton(text="Cryptobot", callback_data=f"crypto_premium_{round(priceprem /0.97,1)}",  icon_custom_emoji_id = 5361914370068613491)],
+            [InlineKeyboardButton(text="СБП", callback_data=f"sbp_premium_friend_{priceprem}",
+                                  icon_custom_emoji_id=5305413839066525446)],
+            [InlineKeyboardButton(text="Cryptobot", callback_data=f"crypto_premium_{round(priceprem / 0.97, 1)}",
+                                  icon_custom_emoji_id=5361914370068613491)],
             [InlineKeyboardButton(text="❌Отмена", callback_data="premium")]
         ])
 
@@ -1031,6 +1072,7 @@ async def process_premium_friend(message: Message, state: FSMContext):
 
     await save_and_delete_previous(message.from_user.id, sent_message.message_id)
     await state.clear()
+
 
 # ===== ОБРАБОТКА КНОПОК МЕНЮ =====
 @router.callback_query(F.data == "menu")
@@ -1074,7 +1116,7 @@ async def crypto_payment(callback: CallbackQuery):
     # 👇 ПРОВЕРКА ПОДПИСКИ
     if not await require_subscription_callback(callback):
         return
-    
+
     user_id = callback.from_user.id
     parts = callback.data.split("_")
 
@@ -1101,7 +1143,7 @@ async def crypto_payment(callback: CallbackQuery):
     elif ptype == "premium" and premium_data:
         period = premium_data.get('period', 'Premium')
         description = f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> Telegram Premium на {period}"
-        base_prices = {"12 месяцев":2800, "6 месяцев": 1500, "3 месяца": 1200}
+        base_prices = {"12 месяцев": 2800, "6 месяцев": 1500, "3 месяца": 1200}
         base_price = base_prices.get(period, amount)
         commission = round(amount - base_price, 1)
 
@@ -1140,7 +1182,7 @@ async def crypto_payment(callback: CallbackQuery):
         text = (
             f"<tg-emoji emoji-id=\"5361914370068613491\">👛</tg-emoji><b>CryptoBot</b>\n\n"
             f"{description}\n"
-            f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Сумма:</b> {round(amount,1)}₽ (комиссия {round(commission,2)}₽)\n"
+            f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Сумма:</b> {round(amount, 1)}₽ (комиссия {round(commission, 2)}₽)\n"
             f"<tg-emoji emoji-id=\"5274099962655816924\">❗️</tg-emoji><b>Комиссия:</b>3%\n\n"
             f"👇Нажмите кнопку для оплаты:"
         )
@@ -1153,10 +1195,10 @@ async def crypto_payment(callback: CallbackQuery):
         # Отправляем с фото
         try:
             if ptype == "stars":
-                sent = await callback.message.answer_photo( caption=text, reply_markup=keyboard,
+                sent = await callback.message.answer_photo(caption=text, reply_markup=keyboard,
                                                            parse_mode="HTML")
             elif ptype == "premium":
-                sent = await callback.message.answer_photo( caption=text, reply_markup=keyboard,
+                sent = await callback.message.answer_photo(caption=text, reply_markup=keyboard,
                                                            parse_mode="HTML")
             elif ptype == "ton":
                 sent = await callback.message.answer_photo(caption=text, reply_markup=keyboard,
@@ -1220,16 +1262,17 @@ async def check_invoice_status(invoice_id: str):
                 return {"status": data["result"]["items"][0]["status"]}
     return {"status": "unknown"}
 
+
 # ====== SBP =======
 @router.callback_query(F.data.startswith("sbp_"))
 async def sbp_payment(callback: CallbackQuery):
     # 👇 ПРОВЕРКА ПОДПИСКИ
     if not await require_subscription_callback(callback):
         return
-    
+
     user_id = callback.from_user.id
     parts = callback.data.split("_")
-    
+
     if len(parts) >= 4:
         ptype = parts[1]
         recipient = parts[2]
@@ -1239,19 +1282,19 @@ async def sbp_payment(callback: CallbackQuery):
         print(f"❌ Недостаточно частей: {len(parts)}")
         await callback.answer("❌ Ошибка", show_alert=True)
         return
-    
+
     # 👇 ПОЛУЧАЕМ ДАННЫЕ ИЗ ХРАНИЛИЩА
     stars_data = get_user_data(user_id, "stars")
     premium_data = get_user_data(user_id, "premium")
     ton_data = get_user_data(user_id, "ton_purchase")
-    
+
     # 👇 ПОЛУЧАЕМ USERNAME
     username = callback.from_user.username
     if not username:
         username = f"id{user_id}"
     else:
         username = f"@{username}"
-    
+
     # 👇 ГЛОБАЛЬНАЯ ПЕРЕМЕННАЯ КУРСА TON
     global TON_RUB
 
@@ -1259,7 +1302,7 @@ async def sbp_payment(callback: CallbackQuery):
     description = f"Оплата {amount}₽"
     base_price = amount
     final_amount = amount
-    
+
     # Определяем описание и разделяем цены для каждого типа товара
     if ptype == "stars" and stars_data:
         star_value = stars_data.get('star_value', '?')
@@ -1271,11 +1314,11 @@ async def sbp_payment(callback: CallbackQuery):
         period = premium_data.get('period', 'Premium')
         priceprem = premium_data.get('priceprem', amount)
         print(f"👑 Premium данные: period={period}, priceprem={priceprem}")
-        
+
         description = f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> Telegram Premium на {period}"
         base_prices = {
             "12 месяцев": 2800,
-            "6 месяцев": 1500, 
+            "6 месяцев": 1500,
             "3 месяца": 1200
         }
         base_price = base_prices.get(period, priceprem)
@@ -1286,21 +1329,21 @@ async def sbp_payment(callback: CallbackQuery):
         description = f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> {ton_value} TON"
         base_price = round(ton_value * (TON_RUB + 20), 1)
         final_amount = round(base_price / 0.92, 1)
-    
+
     order_id = f"{ptype}_{user_id}_{int(time.time())}"
-    
+
     wait_msg = await callback.message.answer("Создаю ссылку для оплаты...")
-    
+
     from username_checker import create_platega_invoice
-    
-    platega_description = f"{ptype.upper()} {round(final_amount,1)}₽"
-    
+
+    platega_description = f"{ptype.upper()} {round(final_amount, 1)}₽"
+
     result = await create_platega_invoice(
         amount_rub=final_amount,
         description=platega_description,
         order_id=order_id
     )
-    
+
     await delete_user_message(user_id, wait_msg.message_id)
 
     if result["success"]:
@@ -1310,7 +1353,7 @@ async def sbp_payment(callback: CallbackQuery):
         elif ptype == "premium" and premium_data:
             period_map = {
                 "12 месяцев": "12",
-                "6 месяцев": "6", 
+                "6 месяцев": "6",
                 "3 месяца": "3"
             }
             quantity = period_map.get(period, "12")
@@ -1318,18 +1361,20 @@ async def sbp_payment(callback: CallbackQuery):
             quantity = ton_data.get('ton_value', '?')
         else:
             quantity = "1"
-        
+
         text = (
             f"<tg-emoji emoji-id=\"5305413839066525446\">🏦</tg-emoji><b>Оплата по СБП</b>\n\n"
             f"{description}\n"
-            f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Сумма:</b> {round(final_amount,1)}₽ (комиссия {round(final_amount - base_price, 1)}₽)\n"
+            f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Сумма:</b> {round(final_amount, 1)}₽ (комиссия {round(final_amount - base_price, 1)}₽)\n"
             f"<tg-emoji emoji-id=\"5274099962655816924\">❗️</tg-emoji><b>Комиссия:</b> 8%\n\n"
             f"👇 Нажмите кнопку для оплаты, а после подтвердите оплату, нажав на \"<tg-emoji emoji-id=\"5206607081334906820\">✔️</tg-emoji>Оплатил\""
         )
 
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="Оплатить", url=result["pay_url"])],
-            [InlineKeyboardButton(text="Оплатил", callback_data=f"paid_{ptype}_{quantity}_{round(final_amount,1)}_{username}", icon_custom_emoji_id=5206607081334906820)],
+            [InlineKeyboardButton(text="Оплатил",
+                                  callback_data=f"paid_{ptype}_{quantity}_{round(final_amount, 1)}_{username}",
+                                  icon_custom_emoji_id=5206607081334906820)],
             [InlineKeyboardButton(text="❌Отмена", callback_data=ptype)]
         ])
 
@@ -1337,31 +1382,33 @@ async def sbp_payment(callback: CallbackQuery):
         await save_and_delete_previous(user_id, sent.message_id)
     else:
         await callback.message.answer(f"❌ Ошибка: {result.get('error')}")
-    
+
     await callback.answer()
+
+
 # ===== КНОПКА "Я ОПЛАТИЛ" =====
 @router.callback_query(F.data.startswith("paid_"))
 async def paid_callback(callback: CallbackQuery):
     # 👇 ПРОВЕРКА ПОДПИСКИ
     if not await require_subscription_callback(callback):
         return
-    
+
     user_id = callback.from_user.id
     parts = callback.data.split("_")
-    
+
     # Формат: paid_тип_количество_сумма_получатель
     if len(parts) >= 5:
-        ptype = parts[1]           # stars, premium, ton
-        quantity = parts[2]         # количество (100, 12, 5)
-        amount = parts[3]           # сумма (163)
-        recipient = parts[4]        # получатель (@username)
+        ptype = parts[1]  # stars, premium, ton
+        quantity = parts[2]  # количество (100, 12, 5)
+        amount = parts[3]  # сумма (163)
+        recipient = parts[4]  # получатель (@username)
 
         # Если username содержит подчеркивания, объединяем остальные части
         if len(parts) > 5:
             recipient = "_".join(parts[4:])
 
         await delete_user_message(user_id, callback.message.message_id)
-        
+
         # Название товара на русском
         product_names = {
             "stars": "Звёзды",
@@ -1369,7 +1416,7 @@ async def paid_callback(callback: CallbackQuery):
             "ton": "TON"
         }
         product_name = product_names.get(ptype, ptype.upper())
-        
+
         # Формируем текст заказа
         order_text = (
             f"<tg-emoji emoji-id=\"5438370951215472013\">✨</tg-emoji><b>НОВЫЙ ЗАКАЗ</b>\n\n"
@@ -1379,23 +1426,193 @@ async def paid_callback(callback: CallbackQuery):
             f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Сумма:</b> {amount}₽\n"
             f"<tg-emoji emoji-id=\"6032604359794104706\">⏰</tg-emoji><b>Время оплаты:</b> {time.strftime('%Y-%m-%d %H:%M:%S')}"
         )
-        
+
         await callback.bot.send_message(
             chat_id=ADMIN_ID,
             text=order_text,
             parse_mode="HTML"
         )
-        
+
         await callback.message.answer(
             f"<b>Спасибо за покупку!</b>\n\n"
             f"Ваш заказ принят и передан администратору.\n"
             f"Ждем вас снова в SpireShop<tg-emoji emoji-id=\"5368469082867769478\">😘</tg-emoji>"
         )
-        
+
         await callback.answer("✅ Заказ отправлен")
     else:
         await callback.answer("❌ Ошибка данных", show_alert=True)
-    
+
+# ===== АДМИН-ПАНЕЛЬ =====
+@router.message(Command("admin"))
+async def admin_panel(message: Message):
+    # Проверка что это админ
+    if message.from_user.id != ADMIN_ID:
+        await message.answer("❌ У вас нет доступа к админ-панели")
+        return
+
+    text = (
+        f"<b>👑 АДМИН-ПАНЕЛЬ</b>\n\n"
+        f"👥 <b>Всего пользователей:</b> {len(user_ids)}\n"
+        f"🆔 <b>Ваш ID:</b> <code>{ADMIN_ID}</code>\n\n"
+        f"Выберите действие:"
+    )
+
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📢 Сделать рассылку", callback_data="admin_broadcast")],
+        [InlineKeyboardButton(text="📦 Последние заказы", callback_data="admin_orders")],
+        [InlineKeyboardButton(text="📊 Статистика", callback_data="admin_stats")],
+        [InlineKeyboardButton(text="⚙️ Изменить цены", callback_data="admin_prices")],
+        [InlineKeyboardButton(text="❌ Закрыть", callback_data="menu")]
+    ])
+
+    await message.answer(text, reply_markup=keyboard, parse_mode="HTML")
+
+# ===== ОБРАБОТЧИКИ АДМИНКИ =====
+@router.callback_query(F.data == "admin_broadcast")
+async def admin_broadcast(callback: CallbackQuery, state: FSMContext):
+    if callback.from_user.id != ADMIN_ID:
+        await callback.answer("❌ Нет доступа", show_alert=True)
+        return
+
+    await callback.message.edit_text(
+        f"<b>📢 РАССЫЛКА</b>\n\n"
+        f"👥 Всего пользователей: {len(user_ids)}\n\n"
+        f"Введите текст для рассылки (можно использовать HTML):"
+    )
+
+    await state.set_state("waiting_broadcast_text")
+    await callback.answer()
+
+@router.message(StateFilter("waiting_broadcast_text"))
+async def process_broadcast(message: Message, state: FSMContext):
+    if message.from_user.id != ADMIN_ID:
+        await state.clear()
+        return
+
+    text = message.html_text
+
+    status_msg = await message.answer(f"📢 Начинаю рассылку {len(user_ids)} пользователям...\n⏳ Пожалуйста, подождите")
+
+    sent = 0
+    failed = 0
+
+    for user_id in user_ids:
+        try:
+            await bot.send_message(user_id, text, parse_mode="HTML")
+            sent += 1
+            if sent % 10 == 0:  # обновляем статус каждые 10 сообщений
+                await status_msg.edit_text(f"📢 Отправлено: {sent}/{len(user_ids)}\n❌ Ошибок: {failed}")
+            await asyncio.sleep(0.05)  # задержка чтобы не забанили
+        except Exception as e:
+            failed += 1
+            print(f"❌ Ошибка отправки пользователю {user_id}: {e}")
+
+    await status_msg.edit_text(
+        f"<b>✅ Рассылка завершена!</b>\n\n"
+        f"📨 Отправлено: {sent}\n"
+        f"❌ Не удалось: {failed}\n"
+        f"👥 Всего: {len(user_ids)}",
+        parse_mode="HTML"
+    )
+
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🔙 Назад в админку", callback_data="admin_panel_back")]
+    ])
+    await message.answer("Что дальше?", reply_markup=keyboard)
+    await state.clear()
+
+@router.callback_query(F.data == "admin_orders")
+async def admin_orders(callback: CallbackQuery):
+    if callback.from_user.id != ADMIN_ID:
+        await callback.answer("❌ Нет доступа", show_alert=True)
+        return
+
+    # Здесь можно показать последние заказы из БД
+    # Пока заглушка
+    text = (
+        f"<b>📦 ПОСЛЕДНИЕ ЗАКАЗЫ</b>\n\n"
+        f"🔜 Функция в разработке\n\n"
+        f"Скоро здесь будет история заказов"
+    )
+
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🔙 Назад", callback_data="admin_panel_back")]
+    ])
+
+    await callback.message.edit_text(text, reply_markup=keyboard, parse_mode="HTML")
+    await callback.answer()
+
+@router.callback_query(F.data == "admin_stats")
+async def admin_stats(callback: CallbackQuery):
+    if callback.from_user.id != ADMIN_ID:
+        await callback.answer("❌ Нет доступа", show_alert=True)
+        return
+
+    # Подсчет статистики
+    total_users = len(user_ids)
+
+    text = (
+        f"<b>📊 СТАТИСТИКА</b>\n\n"
+        f"👥 <b>Всего пользователей:</b> {total_users}\n"
+        f"💰 <b>Всего заказов:</b> {len(user_data)}\n"
+        f"⏱ <b>Время работы:</b> 24/7\n"
+    )
+
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🔙 Назад", callback_data="admin_panel_back")]
+    ])
+
+    await callback.message.edit_text(text, reply_markup=keyboard, parse_mode="HTML")
+    await callback.answer()
+
+@router.callback_query(F.data == "admin_prices")
+async def admin_prices(callback: CallbackQuery):
+    if callback.from_user.id != ADMIN_ID:
+        await callback.answer("❌ Нет доступа", show_alert=True)
+        return
+
+    text = (
+        f"<b>⚙️ ТЕКУЩИЕ ЦЕНЫ</b>\n\n"
+        f"⭐️ <b>Stars:</b> 1.5₽ за звезду\n"
+        f"👑 <b>Premium 12 мес:</b> 2800₽\n"
+        f"👑 <b>Premium 6 мес:</b> 1500₽\n"
+        f"👑 <b>Premium 3 мес:</b> 1200₽\n"
+        f"💎 <b>TON:</b> TON_RUB + 20₽\n\n"
+        f"🔜 Изменение цен скоро будет доступно"
+    )
+
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🔙 Назад", callback_data="admin_panel_back")]
+    ])
+
+    await callback.message.edit_text(text, reply_markup=keyboard, parse_mode="HTML")
+    await callback.answer()
+
+@router.callback_query(F.data == "admin_panel_back")
+async def admin_panel_back(callback: CallbackQuery):
+    if callback.from_user.id != ADMIN_ID:
+        return
+
+    text = (
+        f"<b>👑 АДМИН-ПАНЕЛЬ</b>\n\n"
+        f"👥 <b>Всего пользователей:</b> {len(user_ids)}\n"
+        f"🆔 <b>Ваш ID:</b> <code>{ADMIN_ID}</code>\n\n"
+        f"Выберите действие:"
+    )
+
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📢 Сделать рассылку", callback_data="admin_broadcast")],
+        [InlineKeyboardButton(text="📦 Последние заказы", callback_data="admin_orders")],
+        [InlineKeyboardButton(text="📊 Статистика", callback_data="admin_stats")],
+        [InlineKeyboardButton(text="⚙️ Изменить цены", callback_data="admin_prices")],
+        [InlineKeyboardButton(text="❌ Закрыть", callback_data="menu")]
+    ])
+
+    await callback.message.edit_text(text, reply_markup=keyboard, parse_mode="HTML")
+    await callback.answer()
+
+
 # ===== ЗАПУСК =====
 async def main():
     # 👇 СНАЧАЛА ПРИНУДИТЕЛЬНО УДАЛЯЕМ ВЕБХУК
@@ -1404,7 +1621,7 @@ async def main():
         print("✅ Вебхук удалён")
     except Exception as e:
         print(f"⚠️ Ошибка при удалении вебхука: {e}")
-    
+
     from username_checker import ensure_client
     await ensure_client()
     print("✅ Telethon готов к работе")
@@ -1438,6 +1655,7 @@ async def main():
         print(f"❌ Ошибка запуска: {e}")
     finally:
         await bot.session.close()
+
 
 if __name__ == "__main__":
     asyncio.run(main())
