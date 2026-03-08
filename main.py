@@ -1,4 +1,4 @@
-## main.py - рабочий код с проверкой TON и удалением сообщений
+## main.py - ПОЛНЫЙ КОД С ПРОВЕРКОЙ ПОДПИСКИ
 import sys
 import asyncio
 
@@ -25,6 +25,7 @@ import time
 # ===== КОНФИГУРАЦИЯ =====
 BOT_TOKEN = "8236812443:AAGsoEmE7u9q5eBpKTQ3vlbp4IregP9-oHY"
 ADMIN_ID = 887261650
+ADMIN_CHANNEL = '@spireshop01'  # канал для подписки
 SUPPORT_USERNAME = '@adamyan_ss'
 TON_WALLET = 'UQAL5Y75ykdUsMmW5FgnxKJyz1-njyS_oNuN1Lp2_hgNundO'
 
@@ -68,6 +69,26 @@ async def delete_user_message(user_id: int, message_id: int):
             user_messages[user_id].remove(message_id)
     except:
         pass
+
+
+# ===== ПРОВЕРКА ПОДПИСКИ =====
+async def check_subscription(user_id: int) -> bool:
+    """Проверяет, подписан ли пользователь на канал"""
+    try:
+        member = await bot.get_chat_member(ADMIN_CHANNEL, user_id)
+        return member.status not in ["left", "kicked"]
+    except:
+        return False
+
+async def require_subscription_callback(callback: CallbackQuery) -> bool:
+    """Проверяет подписку и показывает всплывающее окно если нет"""
+    if not await check_subscription(callback.from_user.id):
+        await callback.answer(
+            "❌ Сначала подпишитесь на канал @spireshop01",
+            show_alert=True
+        )
+        return False
+    return True
 
 
 # ===== СОСТОЯНИЯ =====
@@ -171,6 +192,10 @@ async def menu_cmd(message: Message):
 # ===== ОБРАБОТЧИК КНОПКИ "ИНФОРМАЦИЯ" =====
 @router.callback_query(F.data == "info")
 async def info_callback(callback: CallbackQuery, state: FSMContext):
+    # 👇 ПРОВЕРКА ПОДПИСКИ
+    if not await require_subscription_callback(callback):
+        return
+    
     await state.clear()
     
     text = (
@@ -274,6 +299,10 @@ async def process_stars_amount(message: Message, state: FSMContext):
 # ===== КНОПКА "КУПИТЬ СЕБЕ" =====
 @router.callback_query(F.data == "buy_stars_self")
 async def buy_stars_self_callback(callback: CallbackQuery):
+    # 👇 ПРОВЕРКА ПОДПИСКИ
+    if not await require_subscription_callback(callback):
+        return
+    
     user_id = callback.from_user.id
     stars_data = get_user_data(user_id, "stars")
 
@@ -334,6 +363,10 @@ async def buy_stars_self_callback(callback: CallbackQuery):
 # ===== КНОПКА "ПОДАРИТЬ ДРУГУ" =====
 @router.callback_query(F.data == "gift_stars_friend")
 async def gift_stars_friend_callback(callback: CallbackQuery, state: FSMContext):
+    # 👇 ПРОВЕРКА ПОДПИСКИ
+    if not await require_subscription_callback(callback):
+        return
+    
     user_id = callback.from_user.id
     stars_data = get_user_data(user_id, "stars")
 
@@ -368,6 +401,10 @@ async def gift_stars_friend_callback(callback: CallbackQuery, state: FSMContext)
 # ===== ВОЗВРАТ К ВЫБОРУ ПОЛУЧАТЕЛЯ =====
 @router.callback_query(F.data == "back_to_stars_choice")
 async def back_to_stars_choice_callback(callback: CallbackQuery):
+    # 👇 ПРОВЕРКА ПОДПИСКИ
+    if not await require_subscription_callback(callback):
+        return
+    
     user_id = callback.from_user.id
     stars_data = get_user_data(user_id, "stars")
 
@@ -570,6 +607,10 @@ async def process_ton_amount(message: Message, state: FSMContext):
 # ===== КУПИТЬ СЕБЕ =====
 @router.callback_query(F.data == "buy_ton_self")
 async def ton_self_callback(callback: CallbackQuery):
+    # 👇 ПРОВЕРКА ПОДПИСКИ
+    if not await require_subscription_callback(callback):
+        return
+    
     user_id = callback.from_user.id
     data = get_user_data(user_id, "ton_purchase")
 
@@ -613,6 +654,10 @@ async def ton_self_callback(callback: CallbackQuery):
 # ===== ПОДАРИТЬ ДРУГУ =====
 @router.callback_query(F.data == "gift_ton_friend")
 async def ton_friend_callback(callback: CallbackQuery, state: FSMContext):
+    # 👇 ПРОВЕРКА ПОДПИСКИ
+    if not await require_subscription_callback(callback):
+        return
+    
     user_id = callback.from_user.id
     data = get_user_data(user_id, "ton_purchase")
 
@@ -726,6 +771,10 @@ async def premium_cmd(message: Message):
 # ===== КНОПКИ PREMIUM =====
 @router.callback_query(F.data.startswith("premium_"))
 async def premium_period_callback(callback: CallbackQuery, state: FSMContext):
+    # 👇 ПРОВЕРКА ПОДПИСКИ
+    if not await require_subscription_callback(callback):
+        return
+    
     periods = {
         "premium_12": "12 месяцев",
         "premium_6": "6 месяцев",
@@ -770,6 +819,10 @@ async def premium_period_callback(callback: CallbackQuery, state: FSMContext):
 # ===== КНОПКА "КУПИТЬ PREMIUM СЕБЕ" =====
 @router.callback_query(F.data == "buy_premium_self")
 async def buy_premium_self_callback(callback: CallbackQuery):
+    # 👇 ПРОВЕРКА ПОДПИСКИ
+    if not await require_subscription_callback(callback):
+        return
+    
     user_id = callback.from_user.id
     premium_data = get_user_data(user_id, "premium")
 
@@ -839,6 +892,10 @@ async def buy_premium_self_callback(callback: CallbackQuery):
 # ===== КНОПКА "ПОДАРИТЬ PREMIUM ДРУГУ" =====
 @router.callback_query(F.data == "gift_premium_friend")
 async def gift_premium_friend_callback(callback: CallbackQuery, state: FSMContext):
+    # 👇 ПРОВЕРКА ПОДПИСКИ
+    if not await require_subscription_callback(callback):
+        return
+    
     user_id = callback.from_user.id
     premium_data = get_user_data(user_id, "premium")
 
@@ -963,30 +1020,46 @@ async def process_premium_friend(message: Message, state: FSMContext):
 # ===== ОБРАБОТКА КНОПОК МЕНЮ =====
 @router.callback_query(F.data == "menu")
 async def menu_btn(callback: CallbackQuery):
+    # 👇 ПРОВЕРКА ПОДПИСКИ
+    if not await require_subscription_callback(callback):
+        return
     await menu_cmd(callback.message)
     await callback.answer()
 
 
 @router.callback_query(F.data == "stars")
 async def stars_btn(callback: CallbackQuery, state: FSMContext):
+    # 👇 ПРОВЕРКА ПОДПИСКИ
+    if not await require_subscription_callback(callback):
+        return
     await stars_cmd(callback.message, state)
     await callback.answer()
 
 
 @router.callback_query(F.data == "ton")
 async def ton_btn(callback: CallbackQuery, state: FSMContext):
+    # 👇 ПРОВЕРКА ПОДПИСКИ
+    if not await require_subscription_callback(callback):
+        return
     await ton_cmd(callback.message, state)
     await callback.answer()
 
 
 @router.callback_query(F.data == "premium")
 async def premium_btn(callback: CallbackQuery):
+    # 👇 ПРОВЕРКА ПОДПИСКИ
+    if not await require_subscription_callback(callback):
+        return
     await premium_cmd(callback.message)
     await callback.answer()
 
 
 @router.callback_query(F.data.startswith("crypto_"))
 async def crypto_payment(callback: CallbackQuery):
+    # 👇 ПРОВЕРКА ПОДПИСКИ
+    if not await require_subscription_callback(callback):
+        return
+    
     user_id = callback.from_user.id
     parts = callback.data.split("_")
 
@@ -1135,6 +1208,10 @@ async def check_invoice_status(invoice_id: str):
 # ====== SBP =======
 @router.callback_query(F.data.startswith("sbp_"))
 async def sbp_payment(callback: CallbackQuery):
+    # 👇 ПРОВЕРКА ПОДПИСКИ
+    if not await require_subscription_callback(callback):
+        return
+    
     user_id = callback.from_user.id
     parts = callback.data.split("_")
     
@@ -1237,6 +1314,10 @@ async def sbp_payment(callback: CallbackQuery):
 # ===== КНОПКА "Я ОПЛАТИЛ" =====
 @router.callback_query(F.data.startswith("paid_"))
 async def paid_callback(callback: CallbackQuery):
+    # 👇 ПРОВЕРКА ПОДПИСКИ
+    if not await require_subscription_callback(callback):
+        return
+    
     user_id = callback.from_user.id
     parts = callback.data.split("_")
     
