@@ -1282,15 +1282,15 @@ async def sbp_payment(callback: CallbackQuery):
     # Простое описание для Platega (без эмодзи)
     platega_description = f"{ptype.upper()} {round(final_amount,1)}₽"
     
-    result = await create_platega_invoice(
+   result = await create_platega_invoice(
         amount_rub=final_amount,
         description=platega_description,
         order_id=order_id
     )
-    
-   await delete_user_message(user_id, wait_msg.message_id)
 
-    if result["success"]:  # ← этот отступ должен совпадать с предыдущей строкой
+    await delete_user_message(user_id, wait_msg.message_id)  # ← этот отступ
+
+    if result["success"]:  # ← должен быть такой же отступ
     # Определяем количество для передачи
     if ptype == "stars" and stars_data:
         quantity = stars_data.get('star_value', '?')
