@@ -1240,30 +1240,40 @@ async def paid_callback(callback: CallbackQuery):
     user_id = callback.from_user.id
     parts = callback.data.split("_")
     
-    if len(parts) >= 3:
-        ptype = parts[1]
-        amount = parts[2]
-        username = parts[3] if len(parts) > 3 else callback.from_user.username or f"id{user_id}"
+    if len(parts) >= 5:  # формат: paid_тип_количество_сумма_получатель
+        ptype = parts[1]           # stars, premium, ton
+        quantity = parts[2]         # количество (100, 12, 5)
+        amount = parts[3]           # сумма
+        recipient = parts[4]        # получатель (@username или id)
         
-        # Благодарность пользователю
-        await callback.message.answer(
-            f"<b>Спасибо за покупку!</b>\n\n"
-            f"Администратор уже получил уведомление и скоро обработает заказ.\n"
-            f"Ждем вас снова в SpireShop<tg-emoji emoji-id=\"5368469082867769478\">😘</tg-emoji>"
-        )
+        # Название товара на русском
+        product_names = {
+            "stars": "Звёзды",
+            "premium": "Premium",
+            "ton": "TON"
+        }
+        product_name = product_names.get(ptype, ptype.upper())
         
-        # Уведомление админу
-        admin_text = (
+        # Формируем текст заказа
+        order_text = (
             f"💰 <b>НОВЫЙ ЗАКАЗ</b>\n\n"
-            f"👤 <b>Пользователь:</b> {username}\n"
-            f"📦 <b>Товар:</b> {ptype.upper()}\n"
+            f"🎁 <b>Получатель:</b> {recipient}\n"
+            f"📦 <b>Товар:</b> {product_name}\n"
+            f"🔢 <b>Количество:</b> {quantity}\n"
             f"💵 <b>Сумма:</b> {amount}₽\n"
-            f"⏱ <b>Время:</b> {time.strftime('%Y-%m-%d %H:%M:%S')}"
+            f"⏱ <b>Время оплаты:</b> {time.strftime('%Y-%m-%d %H:%M:%S')}"
         )
         
-        await callback.bot.send_message(ADMIN_CHANNEL, admin_text, parse_mode="HTML")
+        # Отправляем в канал
+        await callback.bot.send_message(ADMIN_CHANNEL, order_text, parse_mode="HTML")
         
-        await callback.answer("✅ Заказ отправлен администратору")
+        # Благодарность покупателю
+        await callback.message.answer(
+            f"✅ <b>Спасибо за покупку!</b>\n\n"
+            f"Ваш заказ принят и передан администратору."
+        )
+        
+        await callback.answer("✅ Заказ отправлен")
     else:
         await callback.answer("❌ Ошибка данных", show_alert=True)
 
