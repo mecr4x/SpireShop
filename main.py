@@ -241,6 +241,7 @@ async def stars_cmd(message: Message, state: FSMContext):
         sent_message = await message.answer(text, reply_markup=keyboard)
 
     await save_and_delete_previous(message.from_user.id, sent_message.message_id)
+    await delete_user_message(user_id, callback.message.message_id)
     await state.set_state(Form.waiting_for_stars_amount)
 
 
@@ -540,6 +541,7 @@ async def ton_cmd(message: Message, state: FSMContext):
         sent_message = await message.answer(text, reply_markup=keyboard)
 
     await save_and_delete_previous(message.from_user.id, sent_message.message_id)
+    await delete_user_message(user_id, callback.message.message_id)
     await state.set_state(Form.waiting_for_ton_amount)
 
 #======ОБРАБОТКА СУММЫ ТОН======
@@ -1307,8 +1309,8 @@ async def sbp_payment(callback: CallbackQuery):
         text = (
             f"<tg-emoji emoji-id=\"5305413839066525446\">🏦</tg-emoji><b>Оплата по СБП</b>\n\n"
             f"{description}\n"
-            f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Сумма к оплате:</b> {round(final_amount,1)}₽ (комиссия {round(final_amount - base_price, 1)}₽)\n"
-            f"<tg-emoji emoji-id=\"5274099962655816924\">❗️</tg-emoji><b>Комиссия сервиса:</b> 8%\n\n"
+            f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Сумма:</b> {round(final_amount,1)}₽ (комиссия {round(final_amount - base_price, 1)}₽)\n"
+            f"<tg-emoji emoji-id=\"5274099962655816924\">❗️</tg-emoji><b>Комиссия:</b> 8%\n\n"
             f"👇 Нажмите кнопку для оплаты, а после подтвердите оплату, нажав на \"<tg-emoji emoji-id=\"5206607081334906820\">✔️</tg-emoji>Оплатил\""
         )
 
@@ -1343,7 +1345,7 @@ async def paid_callback(callback: CallbackQuery):
         # Если получатель начинается с @, объединяем остальные части
         if recipient.startswith('@') and len(parts) > 5:
             # Если username содержит подчеркивания
-            recipient = '@' + '_'.join(parts[4:])
+            recipient = '@ + '_'.join(parts[4:])
         
         await delete_user_message(user_id, callback.message.message_id)
         
@@ -1357,12 +1359,12 @@ async def paid_callback(callback: CallbackQuery):
         
         # Формируем текст заказа
         order_text = (
-            f"💰 <b>НОВЫЙ ЗАКАЗ</b>\n\n"
-            f"🎁 <b>Получатель:</b> {recipient}\n"
-            f"📦 <b>Товар:</b> {product_name}\n"
-            f"🔢 <b>Количество:</b> {quantity}\n"
-            f"💵 <b>Сумма:</b> {amount}₽\n"
-            f"⏱ <b>Время оплаты:</b> {time.strftime('%Y-%m-%d %H:%M:%S')}"
+            f"<tg-emoji emoji-id=\"5438370951215472013\">✨</tg-emoji><b>НОВЫЙ ЗАКАЗ</b>\n\n"
+            f"<tg-emoji emoji-id=\"5255975823436973213\">🎁</tg-emoji><b>Получатель:</b> {recipient}\n"
+            f"<tg-emoji emoji-id=\"5406604187683270743\">⭐️</tg-emoji><b>Товар:</b> {product_name}\n"
+            f"<tg-emoji emoji-id=\"5924870095925942277\">⭐️</tg-emoji><b>Количество:</b> {quantity}\n"
+            f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Сумма:</b> {amount}₽\n"
+            f"<tg-emoji emoji-id=\"6032604359794104706\">⏰</tg-emoji><b>Время оплаты:</b> {time.strftime('%Y-%m-%d %H:%M:%S')}"
         )
         
         await callback.bot.send_message(
