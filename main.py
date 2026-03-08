@@ -1290,43 +1290,58 @@ async def sbp_payment(callback: CallbackQuery):
     
     await delete_user_message(user_id, wait_msg.message_id)
 
-    if result["success"]:
-        text = (
-            f"<tg-emoji emoji-id=\"5305413839066525446\">🏦</tg-emoji><b>Оплата по СБП</b>\n\n"
-            f"{description}\n"
-            f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Сумма к оплате:</b> {round(final_amount,1)}₽ (комиссия {round(final_amount - base_price, 1)}₽)\n"
-            f"<tg-emoji emoji-id=\"5274099962655816924\">❗️</tg-emoji><b>Комиссия сервиса:</b> 8%\n\n"
-            f"👇 Нажмите кнопку для оплаты, а после подтвердите оплату, нажав на \"<tg-emoji emoji-id=\"5206607081334906820\">✔️</tg-emoji>Оплатил\""
-        )
-
-        keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="Оплатить", url=result["pay_url"])],
-            [InlineKeyboardButton(text="Оплатил", callback_data=f"paid_{ptype}_{final_amount}_{username}", icon_custom_emoji_id=5206607081334906820)],
-            [InlineKeyboardButton(text="❌Отмена", callback_data=ptype)]
-        ])
-
-        sent = await callback.message.answer(text, reply_markup=keyboard, parse_mode="HTML")
-        await save_and_delete_previous(user_id, sent.message_id)
+   if result["success"]:
+    # Определяем количество для передачи
+    if ptype == "stars" and stars_data:
+        quantity = stars_data.get('star_value', '?')
+    elif ptype == "premium" and premium_data:
+        # Для Premium количество - это период в месяцах
+        period_map = {
+            "12 месяцев": "12",
+            "6 месяцев": "6", 
+            "3 месяца": "3"
+        }
+        quantity = period_map.get(period, "12")
+    elif ptype == "ton" and ton_data:
+        quantity = ton_data.get('ton_value', '?')
     else:
-        await callback.message.answer(f"❌ Ошибка: {result.get('error')}")
+        quantity = "1"
     
-    await callback.answer()
+    text = (
+        f"<tg-emoji emoji-id=\"5305413839066525446\">🏦</tg-emoji><b>Оплата по СБП</b>\n\n"
+        f"{description}\n"
+        f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Сумма к оплате:</b> {round(final_amount,1)}₽ (комиссия {round(final_amount - base_price, 1)}₽)\n"
+        f"<tg-emoji emoji-id=\"5274099962655816924\">❗️</tg-emoji><b>Комиссия сервиса:</b> 8%\n\n"
+        f"👇 Нажмите кнопку для оплаты, а после подтвердите оплату, нажав на \"<tg-emoji emoji-id=\"5206607081334906820\">✔️</tg-emoji>Оплатил\""
+    )
+
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="Оплатить", url=result["pay_url"])],
+        # 👇 ПРАВИЛЬНЫЙ ФОРМАТ: paid_тип_количество_сумма_получатель
+        [InlineKeyboardButton(text="Оплатил", callback_data=f"paid_{ptype}_{quantity}_{round(final_amount,1)}_{username}", icon_custom_emoji_id=5206607081334906820)],
+        [InlineKeyboardButton(text="❌Отмена", callback_data=ptype)]
+    ])
 # ===== КНОПКА "Я ОПЛАТИЛ" =====
 @router.callback_query(F.data.startswith("paid_"))
 async def paid_callback(callback: CallbackQuery):
-    # 👇 ПРОВЕРКА ПОДПИСКИ
     if not await require_subscription_callback(callback):
         return
     
     user_id = callback.from_user.id
     parts = callback.data.split("_")
     
-    if len(parts) >= 5:  # формат: paid_тип_количество_сумма_получатель
+    # Формат: paid_тип_количество_сумма_получатель
+    if len(parts) >= 5:
         ptype = parts[1]           # stars, premium, ton
-        quantity = parts[2]         # количество
-        amount = parts[3]           # сумма
-        recipient = parts[4]        # получатель (@username или id)
+        quantity = parts[2]         # количество (100, 12, 5)
+        amount = parts[3]           # сумма (163)
+        recipient = parts[4]        # получатель (@username)
 
+        # Если получатель начинается с @, объединяем остальные части
+        if recipient.startswith('@') and len(parts) > 5:
+            # Если username содержит подчеркивания
+            recipient = '@' + '_'.join(parts[4:])
+        
         await delete_user_message(user_id, callback.message.message_id)
         
         # Название товара на русском
@@ -1347,14 +1362,12 @@ async def paid_callback(callback: CallbackQuery):
             f"⏱ <b>Время оплаты:</b> {time.strftime('%Y-%m-%d %H:%M:%S')}"
         )
         
-        # 👇 ОТПРАВЛЯЕМ ТЕБЕ В ЛИЧКУ
         await callback.bot.send_message(
-            chat_id=ADMIN_ID,  # твой Telegram ID (число)
+            chat_id=ADMIN_ID,
             text=order_text,
             parse_mode="HTML"
         )
         
-        # Благодарность покупателю
         await callback.message.answer(
             f"<b>Спасибо за покупку!</b>\n\n"
             f"Ваш заказ принят и передан администратору.\n"
