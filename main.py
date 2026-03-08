@@ -1431,7 +1431,7 @@ async def main():
         print("⏳ Ожидаю сообщений...")
         print("=" * 50)
 
-        # 👇 ЭТА СТРОКА ЗАПУСКАЕТ БОТА
+        # 👇 ЭТА СТРОКА ДОЛЖНА БЫТЬ!
         await dp.start_polling(bot, skip_updates=True)
 
     except Exception as e:
