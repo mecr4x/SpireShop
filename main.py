@@ -1357,10 +1357,9 @@ async def paid_callback(callback: CallbackQuery):
         amount = parts[3]           # сумма (163)
         recipient = parts[4]        # получатель (@username)
 
-        # Если получатель начинается с @, объединяем остальные части
-        if recipient.startswith('@') and len(parts) > 5:
-            # Если username содержит подчеркивания
-            recipient = '@ + '_'.join(parts[4:])
+        # Если username содержит подчеркивания, объединяем остальные части
+        if len(parts) > 5:
+           recipient = '_'.join(parts[4:])  # 👈 просто объединяем без добавления @
         
         await delete_user_message(user_id, callback.message.message_id)
         
