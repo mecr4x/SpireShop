@@ -1242,9 +1242,11 @@ async def paid_callback(callback: CallbackQuery):
     
     if len(parts) >= 5:  # формат: paid_тип_количество_сумма_получатель
         ptype = parts[1]           # stars, premium, ton
-        quantity = parts[2]         # количество (100, 12, 5)
+        quantity = parts[2]         # количество
         amount = parts[3]           # сумма
         recipient = parts[4]        # получатель (@username или id)
+
+        await delete_user_message(user_id, callback.message.message_id)
         
         # Название товара на русском
         product_names = {
@@ -1264,20 +1266,23 @@ async def paid_callback(callback: CallbackQuery):
             f"⏱ <b>Время оплаты:</b> {time.strftime('%Y-%m-%d %H:%M:%S')}"
         )
         
-        # Отправляем в канал
-        await callback.bot.send_message(ADMIN_CHANNEL, order_text, parse_mode="HTML")
+        # 👇 ОТПРАВЛЯЕМ ТЕБЕ В ЛИЧКУ
+        await callback.bot.send_message(
+            chat_id=887261650,  # твой Telegram ID (число)
+            text=order_text,
+            parse_mode="HTML"
+        )
         
         # Благодарность покупателю
         await callback.message.answer(
-            f"✅ <b>Спасибо за покупку!</b>\n\n"
-            f"Ваш заказ принят и передан администратору."
+            f"<b>Спасибо за покупку!</b>\n\n"
+            f"Ваш заказ принят и передан администратору.\n"
+            f"Ждем вас снова в SpireShop<tg-emoji emoji-id=\"5368469082867769478\">😘</tg-emoji>"
         )
         
         await callback.answer("✅ Заказ отправлен")
     else:
         await callback.answer("❌ Ошибка данных", show_alert=True)
-
-
 # ===== ЗАПУСК =====
 async def main():
     # 👇 СНАЧАЛА ПРИНУДИТЕЛЬНО УДАЛЯЕМ ВЕБХУК
