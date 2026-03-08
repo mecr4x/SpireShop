@@ -1350,16 +1350,15 @@ async def paid_callback(callback: CallbackQuery):
     user_id = callback.from_user.id
     parts = callback.data.split("_")
     
-    # Формат: paid_тип_количество_сумма_получатель
-    if len(parts) >= 5:
-        ptype = parts[1]           # stars, premium, ton
-        quantity = parts[2]         # количество (100, 12, 5)
-        amount = parts[3]           # сумма (163)
-        recipient = parts[4]        # получатель (@username)
+        if len(parts) >= 5:
+        ptype = parts[1]
+        quantity = parts[2]
+        amount = parts[3]
+        recipient = parts[4]
 
         # Если username содержит подчеркивания, объединяем остальные части
         if len(parts) > 5:
-           recipient = '_'.join(parts[4:])  # 👈 просто объединяем без добавления @
+            recipient = "_".join(parts[4:])  # 👈 ИСПРАВЛЕНО
         
         await delete_user_message(user_id, callback.message.message_id)
         
