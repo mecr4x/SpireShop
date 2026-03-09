@@ -1,6 +1,7 @@
 ## main.py - ПОЛНЫЙ КОД С ПРОВЕРКОЙ ПОДПИСКИ
 import sys
 import asyncio
+import signal
 
 # Для Windows
 if sys.platform == 'win32':
@@ -37,6 +38,17 @@ dp.include_router(router)
 
 # ===== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ =====
 TON_RUB = 140
+
+async def on_shutdown():
+    """Вызывается при получении сигнала SIGTERM или SIGINT."""
+    print("⚠️ Получен сигнал остановки. Завершаем работу...")
+    
+    # Здесь ты можешь сохранить важные данные, если нужно
+    # Например, можно записать в user_data, что бот останавливается
+    
+    # Закрываем сессию бота
+    await bot.session.close()
+    print("👋 Бот остановлен")
 
 # ===== ДЛЯ АДМИНКИ =====
 user_ids = set()  # множество для хранения ID всех пользователей
@@ -1615,6 +1627,14 @@ async def admin_panel_back(callback: CallbackQuery):
 
 # ===== ЗАПУСК =====
 async def main():
+    print("🔥 Функция main() запущена")
+    print("🔥 PID процесса:", os.getpid())
+    
+    # Добавляем обработчики сигналов
+    loop = asyncio.get_running_loop()
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        loop.add_signal_handler(sig, lambda: asyncio.create_task(on_shutdown()))
+    
     # Удаляем вебхук
     try:
         await bot.delete_webhook()
@@ -1649,6 +1669,11 @@ async def main():
         print("=" * 50)
 
         await dp.start_polling(bot, skip_updates=True)
+        
+    except Exception as e:
+        print(f"❌❌❌ КРИТИЧЕСКАЯ ОШИБКА: {e}")
+        import traceback
+        traceback.print_exc()
     finally:
         await bot.session.close()
 
