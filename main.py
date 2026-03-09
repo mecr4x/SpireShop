@@ -17,120 +17,10 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.client.default import DefaultBotProperties
+from aiogram.filters import StateFilter  # добавь это к другим импортам
 from aiohttp import web
 import json
 import time
-import os 
-import signal
-from datetime import datetime
-
-# ===== ФУНКЦИЯ КОРРЕКТНОГО ЗАВЕРШЕНИЯ =====
-async def shutdown(sig: signal.Signals):
-    """
-    Корректно завершает работу бота при получении сигнала SIGTERM или SIGINT.
-    Сохраняет все важные данные перед выходом.
-    """
-    print(f"\n⚠️⚠️⚠️ ПОЛУЧЕН СИГНАЛ {sig.name} ⚠️⚠️⚠️")
-    print(f"🕒 Время: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print("📦 Начинаем сохранение данных и завершение работы...")
-    
-    # ===== 1. СОХРАНЯЕМ ВАЖНЫЕ ДАННЫЕ =====
-    try:
-        # Сохраняем user_data в файл (незавершённые платежи, состояния)
-        if user_data:
-            with open("user_data_backup.json", "w") as f:
-                # Преобразуем для JSON (ключи должны быть строками)
-                backup_data = {str(k): v for k, v in user_data.items()}
-                json.dump(backup_data, f, indent=2, ensure_ascii=False)
-            print(f"✅ Сохранены данные {len(user_data)} пользователей")
-        
-        # Сохраняем ID всех пользователей
-        if 'user_ids' in globals() and user_ids:
-            with open("user_ids_backup.txt", "w") as f:
-                for uid in user_ids:
-                    f.write(f"{uid}\n")
-            print(f"✅ Сохранены ID {len(user_ids)} пользователей")
-        
-        # Сохраняем незавершённые платежи (если есть)
-        pending = {}
-        for uid, data in user_data.items():
-            if "pending_invoices" in data:
-                pending[str(uid)] = data["pending_invoices"]
-        
-        if pending:
-            with open("pending_payments_backup.json", "w") as f:
-                json.dump(pending, f, indent=2)
-            print(f"✅ Сохранены незавершённые платежи для {len(pending)} пользователей")
-            
-    except Exception as e:
-        print(f"❌ Ошибка при сохранении данных: {e}")
-    
-    # ===== 2. ЗАВЕРШАЕМ РАБОТУ БОТА =====
-    print("🛑 Останавливаем получение новых обновлений...")
-    try:
-        await dp.stop_polling()
-        print("✅ Поллинг остановлен")
-    except Exception as e:
-        print(f"❌ Ошибка при остановке поллинга: {e}")
-    
-    print("🔌 Закрываем соединение с Telegram...")
-    try:
-        await bot.session.close()
-        print("✅ Соединение закрыто")
-    except Exception as e:
-        print(f"❌ Ошибка при закрытии соединения: {e}")
-    
-    # ===== 3. СОЗДАЁМ ФАЙЛ-ФЛАГ, ЧТО БОТ БЫЛ КОРРЕКТНО ОСТАНОВЛЕН =====
-    try:
-        with open("bot_shutdown_flag.txt", "w") as f:
-            f.write(f"Корректно остановлен {datetime.now().isoformat()}")
-        print("✅ Флаг остановки создан")
-    except:
-        pass
-    
-    print("👋 Бот успешно завершил работу. До свидания!")
-    # Принудительно завершаем все задачи (на случай, если что-то зависло)
-    tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
-    for task in tasks:
-        task.cancel()
-    print(f"✅ Отменено {len(tasks)} фоновых задач")
-
-# ===== ФУНКЦИЯ ВОССТАНОВЛЕНИЯ ДАННЫХ ПРИ СТАРТЕ =====
-async def restore_data():
-    """Восстанавливает сохранённые данные после перезапуска"""
-    print("🔄 Восстанавливаем сохранённые данные...")
-    
-    # Восстанавливаем user_data
-    if os.path.exists("user_data_backup.json"):
-        try:
-            with open("user_data_backup.json", "r") as f:
-                backup_data = json.load(f)
-                # Преобразуем ключи обратно в int
-                for k, v in backup_data.items():
-                    user_data[int(k)] = v
-            print(f"✅ Восстановлены данные {len(user_data)} пользователей")
-            os.remove("user_data_backup.json")
-        except Exception as e:
-            print(f"❌ Ошибка восстановления user_data: {e}")
-    
-    # Восстанавливаем user_ids
-    if os.path.exists("user_ids_backup.txt"):
-        try:
-            with open("user_ids_backup.txt", "r") as f:
-                for line in f:
-                    user_ids.add(int(line.strip()))
-            print(f"✅ Восстановлены ID {len(user_ids)} пользователей")
-            os.remove("user_ids_backup.txt")
-        except Exception as e:
-            print(f"❌ Ошибка восстановления user_ids: {e}")
-    
-    # Проверяем флаг корректной остановки
-    if os.path.exists("bot_shutdown_flag.txt"):
-        print("✅ Бот был корректно остановлен в прошлый раз")
-        os.remove("bot_shutdown_flag.txt")
-    else:
-        print("⚠️ Прошлый запуск был аварийным!")
-
 
 # ===== КОНФИГУРАЦИЯ =====
 BOT_TOKEN = "8236812443:AAGsoEmE7u9q5eBpKTQ3vlbp4IregP9-oHY"
@@ -147,6 +37,19 @@ dp.include_router(router)
 
 # ===== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ =====
 TON_RUB = 140
+
+# ===== ДЛЯ АДМИНКИ =====
+user_ids = set()  # множество для хранения ID всех пользователей
+admin_commands = {}  # для хранения временных данных
+
+# ===== СОХРАНЕНИЕ ВСЕХ ПОЛЬЗОВАТЕЛЕЙ =====
+@router.message()
+async def save_all_users(message: Message):
+    user_ids.add(message.from_user.id)
+
+@router.callback_query()
+async def save_all_users_callback(callback: CallbackQuery):
+    user_ids.add(callback.from_user.id)
 
 # ===== ХРАНИЛИЩЕ ДЛЯ УДАЛЕНИЯ СООБЩЕНИЙ =====
 user_messages = {}
@@ -206,10 +109,10 @@ class Form(StatesGroup):
     waiting_for_stars_amount = State()
     waiting_for_friend_username = State()
     waiting_for_ton_address = State()
-    waiting_for_ton_amount = State()  # 👈 ЭТО ДОЛЖНО БЫТЬ
+    waiting_for_ton_amount = State()
     waiting_for_ton_friend_username = State()
     waiting_for_premium_friend = State()
-
+    waiting_broadcast_text = State()
 
 # ===== ХРАНИЛИЩЕ ДАННЫХ =====
 user_data = {}
@@ -1473,6 +1376,175 @@ async def paid_callback(callback: CallbackQuery):
         await callback.answer("✅ Заказ отправлен")
     else:
         await callback.answer("❌ Ошибка данных", show_alert=True)
+
+# ===== АДМИН-ПАНЕЛЬ =====
+@router.message(Command("admin"))
+async def admin_panel(message: Message):
+    # Проверка что это админ
+    if message.from_user.id != ADMIN_ID:
+        await message.answer("❌ У вас нет доступа к админ-панели")
+        return
+    
+    text = (
+        f"<b>👑 АДМИН-ПАНЕЛЬ</b>\n\n"
+        f"👥 <b>Всего пользователей:</b> {len(user_ids)}\n"
+        f"🆔 <b>Ваш ID:</b> <code>{ADMIN_ID}</code>\n\n"
+        f"Выберите действие:"
+    )
+    
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📢 Сделать рассылку", callback_data="admin_broadcast")],
+        [InlineKeyboardButton(text="📦 Последние заказы", callback_data="admin_orders")],
+        [InlineKeyboardButton(text="📊 Статистика", callback_data="admin_stats")],
+        [InlineKeyboardButton(text="⚙️ Изменить цены", callback_data="admin_prices")],
+        [InlineKeyboardButton(text="❌ Закрыть", callback_data="menu")]
+    ])
+    
+    await message.answer(text, reply_markup=keyboard, parse_mode="HTML")
+
+# ===== ОБРАБОТЧИКИ АДМИНКИ =====
+@router.callback_query(F.data == "admin_broadcast")
+async def admin_broadcast(callback: CallbackQuery, state: FSMContext):
+    if callback.from_user.id != ADMIN_ID:
+        await callback.answer("❌ Нет доступа", show_alert=True)
+        return
+    
+    await callback.message.edit_text(
+        f"<b>📢 РАССЫЛКА</b>\n\n"
+        f"👥 Всего пользователей: {len(user_ids)}\n\n"
+        f"Введите текст для рассылки (можно использовать HTML):"
+    )
+    
+    await state.set_state("waiting_broadcast_text")
+    await callback.answer()
+
+@router.message(StateFilter("waiting_broadcast_text"))
+async def process_broadcast(message: Message, state: FSMContext):
+    if message.from_user.id != ADMIN_ID:
+        await state.clear()
+        return
+    
+    text = message.html_text
+    
+    status_msg = await message.answer(f"📢 Начинаю рассылку {len(user_ids)} пользователям...\n⏳ Пожалуйста, подождите")
+    
+    sent = 0
+    failed = 0
+    
+    for user_id in user_ids:
+        try:
+            await bot.send_message(user_id, text, parse_mode="HTML")
+            sent += 1
+            if sent % 10 == 0:  # обновляем статус каждые 10 сообщений
+                await status_msg.edit_text(f"📢 Отправлено: {sent}/{len(user_ids)}\n❌ Ошибок: {failed}")
+            await asyncio.sleep(0.05)  # задержка чтобы не забанили
+        except Exception as e:
+            failed += 1
+            print(f"❌ Ошибка отправки пользователю {user_id}: {e}")
+    
+    await status_msg.edit_text(
+        f"<b>✅ Рассылка завершена!</b>\n\n"
+        f"📨 Отправлено: {sent}\n"
+        f"❌ Не удалось: {failed}\n"
+        f"👥 Всего: {len(user_ids)}",
+        parse_mode="HTML"
+    )
+    
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🔙 Назад в админку", callback_data="admin_panel_back")]
+    ])
+    await message.answer("Что дальше?", reply_markup=keyboard)
+    await state.clear()
+
+@router.callback_query(F.data == "admin_orders")
+async def admin_orders(callback: CallbackQuery):
+    if callback.from_user.id != ADMIN_ID:
+        await callback.answer("❌ Нет доступа", show_alert=True)
+        return
+    
+    # Здесь можно показать последние заказы из БД
+    # Пока заглушка
+    text = (
+        f"<b>📦 ПОСЛЕДНИЕ ЗАКАЗЫ</b>\n\n"
+        f"🔜 Функция в разработке\n\n"
+        f"Скоро здесь будет история заказов"
+    )
+    
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🔙 Назад", callback_data="admin_panel_back")]
+    ])
+    
+    await callback.message.edit_text(text, reply_markup=keyboard, parse_mode="HTML")
+    await callback.answer()
+
+@router.callback_query(F.data == "admin_stats")
+async def admin_stats(callback: CallbackQuery):
+    if callback.from_user.id != ADMIN_ID:
+        await callback.answer("❌ Нет доступа", show_alert=True)
+        return
+    
+    # Подсчет статистики
+    total_users = len(user_ids)
+    
+    text = (
+        f"<b>📊 СТАТИСТИКА</b>\n\n"
+        f"👥 <b>Всего пользователей:</b> {total_users}\n"
+        f"💰 <b>Всего заказов:</b> {len(user_data)}\n"
+        f"⏱ <b>Время работы:</b> 24/7\n"
+    )
+    
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🔙 Назад", callback_data="admin_panel_back")]
+    ])
+    
+    await callback.message.edit_text(text, reply_markup=keyboard, parse_mode="HTML")
+    await callback.answer()
+
+@router.callback_query(F.data == "admin_prices")
+async def admin_prices(callback: CallbackQuery):
+    if callback.from_user.id != ADMIN_ID:
+        await callback.answer("❌ Нет доступа", show_alert=True)
+        return
+    
+    text = (
+        f"<b>⚙️ ТЕКУЩИЕ ЦЕНЫ</b>\n\n"
+        f"⭐️ <b>Stars:</b> 1.5₽ за звезду\n"
+        f"👑 <b>Premium 12 мес:</b> 2800₽\n"
+        f"👑 <b>Premium 6 мес:</b> 1500₽\n"
+        f"👑 <b>Premium 3 мес:</b> 1200₽\n"
+        f"💎 <b>TON:</b> TON_RUB + 20₽\n\n"
+        f"🔜 Изменение цен скоро будет доступно"
+    )
+    
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🔙 Назад", callback_data="admin_panel_back")]
+    ])
+    
+    await callback.message.edit_text(text, reply_markup=keyboard, parse_mode="HTML")
+    await callback.answer()
+
+@router.callback_query(F.data == "admin_panel_back")
+async def admin_panel_back(callback: CallbackQuery):
+    if callback.from_user.id != ADMIN_ID:
+        return
+    
+    text = (
+        f"<b>👑 АДМИН-ПАНЕЛЬ</b>\n\n"
+        f"👥 <b>Всего пользователей:</b> {len(user_ids)}\n"
+        f"🆔 <b>Ваш ID:</b> <code>{ADMIN_ID}</code>\n\n"
+        f"Выберите действие:"
+    )
+    
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📢 Сделать рассылку", callback_data="admin_broadcast")],
+        [InlineKeyboardButton(text="📦 Последние заказы", callback_data="admin_orders")],
+        [InlineKeyboardButton(text="📊 Статистика", callback_data="admin_stats")],
+        [InlineKeyboardButton(text="⚙️ Изменить цены", callback_data="admin_prices")],
+        [InlineKeyboardButton(text="❌ Закрыть", callback_data="menu")]
+    ])
+    
+    await callback.message.edit_text(text, reply_markup=keyboard, parse_mode="HTML")
+    await callback.answer()
 
 
 
