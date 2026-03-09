@@ -1,12 +1,21 @@
 ## main.py - ПОЛНЫЙ КОД С ПРОВЕРКОЙ ПОДПИСКИ
 import sys
 import asyncio
+import logging
+logging.basicConfig(level=logging.DEBUG)
+print("🔥🔥🔥 СТАРТ СКРИПТА 🔥🔥🔥")
 
 # Для Windows
 if sys.platform == 'win32':
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 import logging
 import time
+import signal
+
+def signal_handler(sig, frame):
+    print(f"🔥 Получен сигнал {sig}, но мы работаем дальше")
+
+signal.signal(signal.SIGTERM, signal_handler)
 
 import aiohttp
 import re
@@ -1615,6 +1624,8 @@ async def admin_panel_back(callback: CallbackQuery):
 
 # ===== ЗАПУСК =====
 async def main():
+    print("🔥 Функция main() запущена")
+    print("🔥 PID процесса:", os.getpid())
     # 👇 СНАЧАЛА ПРИНУДИТЕЛЬНО УДАЛЯЕМ ВЕБХУК
     try:
         await bot.delete_webhook()
@@ -1648,8 +1659,11 @@ async def main():
         print("⏳ Ожидаю сообщений...")
         print("=" * 50)
 
-        # 👇 ЭТА СТРОКА ДОЛЖНА БЫТЬ!
         await dp.start_polling(bot, skip_updates=True)
+except Exception as e:
+    print(f"❌❌❌ КРИТИЧЕСКАЯ ОШИБКА: {e}")
+    import traceback
+    traceback.print_exc()
 
     except Exception as e:
         print(f"❌ Ошибка запуска: {e}")
