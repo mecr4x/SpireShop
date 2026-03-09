@@ -1628,6 +1628,15 @@ async def admin_panel_back(callback: CallbackQuery):
 
 # ===== ЗАПУСК =====
 async def main():
+    # 👇 УБИВАЕМ ВСЕ СТАРЫЕ ПРОЦЕССЫ БОТА
+    try:
+        import subprocess
+        subprocess.run("pkill -f main.py", shell=True)
+        print("✅ Старые процессы убиты")
+        await asyncio.sleep(2)
+    except:
+        pass
+    
     print("🔥 Функция main() запущена")
     print("🔥 PID процесса:", os.getpid())
     
