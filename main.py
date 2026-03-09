@@ -22,7 +22,7 @@ import json
 import time
 import os 
 import signal
-from datatime import datatime
+from datetime import datetime
 
 # ===== ФУНКЦИЯ КОРРЕКТНОГО ЗАВЕРШЕНИЯ =====
 async def shutdown(sig: signal.Signals):
