@@ -20,6 +20,116 @@ from aiogram.client.default import DefaultBotProperties
 from aiohttp import web
 import json
 import time
+import os 
+import signal
+from datatime import datatime
+
+# ===== ФУНКЦИЯ КОРРЕКТНОГО ЗАВЕРШЕНИЯ =====
+async def shutdown(sig: signal.Signals):
+    """
+    Корректно завершает работу бота при получении сигнала SIGTERM или SIGINT.
+    Сохраняет все важные данные перед выходом.
+    """
+    print(f"\n⚠️⚠️⚠️ ПОЛУЧЕН СИГНАЛ {sig.name} ⚠️⚠️⚠️")
+    print(f"🕒 Время: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print("📦 Начинаем сохранение данных и завершение работы...")
+    
+    # ===== 1. СОХРАНЯЕМ ВАЖНЫЕ ДАННЫЕ =====
+    try:
+        # Сохраняем user_data в файл (незавершённые платежи, состояния)
+        if user_data:
+            with open("user_data_backup.json", "w") as f:
+                # Преобразуем для JSON (ключи должны быть строками)
+                backup_data = {str(k): v for k, v in user_data.items()}
+                json.dump(backup_data, f, indent=2, ensure_ascii=False)
+            print(f"✅ Сохранены данные {len(user_data)} пользователей")
+        
+        # Сохраняем ID всех пользователей
+        if 'user_ids' in globals() and user_ids:
+            with open("user_ids_backup.txt", "w") as f:
+                for uid in user_ids:
+                    f.write(f"{uid}\n")
+            print(f"✅ Сохранены ID {len(user_ids)} пользователей")
+        
+        # Сохраняем незавершённые платежи (если есть)
+        pending = {}
+        for uid, data in user_data.items():
+            if "pending_invoices" in data:
+                pending[str(uid)] = data["pending_invoices"]
+        
+        if pending:
+            with open("pending_payments_backup.json", "w") as f:
+                json.dump(pending, f, indent=2)
+            print(f"✅ Сохранены незавершённые платежи для {len(pending)} пользователей")
+            
+    except Exception as e:
+        print(f"❌ Ошибка при сохранении данных: {e}")
+    
+    # ===== 2. ЗАВЕРШАЕМ РАБОТУ БОТА =====
+    print("🛑 Останавливаем получение новых обновлений...")
+    try:
+        await dp.stop_polling()
+        print("✅ Поллинг остановлен")
+    except Exception as e:
+        print(f"❌ Ошибка при остановке поллинга: {e}")
+    
+    print("🔌 Закрываем соединение с Telegram...")
+    try:
+        await bot.session.close()
+        print("✅ Соединение закрыто")
+    except Exception as e:
+        print(f"❌ Ошибка при закрытии соединения: {e}")
+    
+    # ===== 3. СОЗДАЁМ ФАЙЛ-ФЛАГ, ЧТО БОТ БЫЛ КОРРЕКТНО ОСТАНОВЛЕН =====
+    try:
+        with open("bot_shutdown_flag.txt", "w") as f:
+            f.write(f"Корректно остановлен {datetime.now().isoformat()}")
+        print("✅ Флаг остановки создан")
+    except:
+        pass
+    
+    print("👋 Бот успешно завершил работу. До свидания!")
+    # Принудительно завершаем все задачи (на случай, если что-то зависло)
+    tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
+    for task in tasks:
+        task.cancel()
+    print(f"✅ Отменено {len(tasks)} фоновых задач")
+
+# ===== ФУНКЦИЯ ВОССТАНОВЛЕНИЯ ДАННЫХ ПРИ СТАРТЕ =====
+async def restore_data():
+    """Восстанавливает сохранённые данные после перезапуска"""
+    print("🔄 Восстанавливаем сохранённые данные...")
+    
+    # Восстанавливаем user_data
+    if os.path.exists("user_data_backup.json"):
+        try:
+            with open("user_data_backup.json", "r") as f:
+                backup_data = json.load(f)
+                # Преобразуем ключи обратно в int
+                for k, v in backup_data.items():
+                    user_data[int(k)] = v
+            print(f"✅ Восстановлены данные {len(user_data)} пользователей")
+            os.remove("user_data_backup.json")
+        except Exception as e:
+            print(f"❌ Ошибка восстановления user_data: {e}")
+    
+    # Восстанавливаем user_ids
+    if os.path.exists("user_ids_backup.txt"):
+        try:
+            with open("user_ids_backup.txt", "r") as f:
+                for line in f:
+                    user_ids.add(int(line.strip()))
+            print(f"✅ Восстановлены ID {len(user_ids)} пользователей")
+            os.remove("user_ids_backup.txt")
+        except Exception as e:
+            print(f"❌ Ошибка восстановления user_ids: {e}")
+    
+    # Проверяем флаг корректной остановки
+    if os.path.exists("bot_shutdown_flag.txt"):
+        print("✅ Бот был корректно остановлен в прошлый раз")
+        os.remove("bot_shutdown_flag.txt")
+    else:
+        print("⚠️ Прошлый запуск был аварийным!")
 
 
 # ===== КОНФИГУРАЦИЯ =====
@@ -1366,8 +1476,21 @@ async def paid_callback(callback: CallbackQuery):
 
 
 
-# ===== ЗАПУСК =====
+# ===== ИЗМЕНЁННАЯ ФУНКЦИЯ MAIN =====
 async def main():
+    # Восстанавливаем данные
+    await restore_data()
+    
+    # Получаем текущий цикл событий
+    loop = asyncio.get_running_loop()
+    
+    # Регистрируем обработчики сигналов
+    for sig in (signal.SIGTERM, signal.SIGINT):
+        loop.add_signal_handler(
+            sig,
+            lambda s=sig: asyncio.create_task(shutdown(s))
+        )
+    
     # 👇 СНАЧАЛА ПРИНУДИТЕЛЬНО УДАЛЯЕМ ВЕБХУК
     try:
         await bot.delete_webhook()
@@ -1407,6 +1530,3 @@ async def main():
         print(f"❌ Ошибка запуска: {e}")
     finally:
         await bot.session.close()
-
-if __name__ == "__main__":
-    asyncio.run(main())
