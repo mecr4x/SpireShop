@@ -1626,7 +1626,8 @@ async def admin_panel_back(callback: CallbackQuery):
 async def main():
     print("🔥 Функция main() запущена")
     print("🔥 PID процесса:", os.getpid())
-    # 👇 СНАЧАЛА ПРИНУДИТЕЛЬНО УДАЛЯЕМ ВЕБХУК
+    
+    # Удаляем вебхук
     try:
         await bot.delete_webhook()
         print("✅ Вебхук удалён")
@@ -1660,16 +1661,13 @@ async def main():
         print("=" * 50)
 
         await dp.start_polling(bot, skip_updates=True)
-except Exception as e:
-    print(f"❌❌❌ КРИТИЧЕСКАЯ ОШИБКА: {e}")
-    import traceback
-    traceback.print_exc()
-
+        
     except Exception as e:
-        print(f"❌ Ошибка запуска: {e}")
+        print(f"❌❌❌ КРИТИЧЕСКАЯ ОШИБКА: {e}")
+        import traceback
+        traceback.print_exc()
     finally:
         await bot.session.close()
-
 
 if __name__ == "__main__":
     asyncio.run(main())
