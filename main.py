@@ -1,5 +1,6 @@
 ## main.py - ПОЛНЫЙ КОД С ПРОВЕРКОЙ ПОДПИСКИ
 import sys
+import os
 import asyncio
 import logging
 logging.basicConfig(level=logging.DEBUG)
