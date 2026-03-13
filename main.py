@@ -1581,7 +1581,7 @@ async def main():
     print("🧹 Удаление сообщений: Включено")
     print("=" * 50)
 
-    try:
+       try:
         global TON_RUB
         TON_RUB = await get_ton_price()
         print(f"💰 Курс TON: {TON_RUB}₽")
@@ -1596,24 +1596,19 @@ async def main():
         print("⏳ Ожидаю сообщений...")
         print("=" * 50)
 
-        # Запускаем polling
-    await dp.start_polling(bot, skip_updates=True)
-
-    # 👇 ЭТА СТРОКА ДОЛЖНА БЫТЬ ВНУТРИ try
-    print("🔄 Бот запущен, ожидаю события завершения...")
-    await asyncio.Event().wait()
-
-except Exception as e:
-    # 👇 ЭТОТ БЛОК ДОЛЖЕН БЫТЬ НА ОДНОМ УРОВНЕ С try
-    print(f"❌ Ошибка запуска: {e}")
-    import traceback
-    traceback.print_exc()
-finally:
-    # 👇 И ЭТОТ БЛОК ТОЖЕ НА ОДНОМ УРОВНЕ
-    await bot.session.close()
-
+        # 👇 ВСЁ ЭТО ВНУТРИ ПЕРВОГО TRY
+        print("🔄 Бот запущен, ожидаю события завершения...")
+        await dp.start_polling(bot, skip_updates=True)
+        await asyncio.Event().wait()
 
     except Exception as e:
-        print(f"❌ Ошибка запуска: {e}")
+        print(f"❌❌❌ КРИТИЧЕСКАЯ ОШИБКА: {e}")
+        import traceback
+        traceback.print_exc()
+
     finally:
+        print("👋 Завершение работы...")
         await bot.session.close()
+
+if __name__ == "__main__":
+    asyncio.run(main())
