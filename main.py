@@ -1597,6 +1597,10 @@ async def main():
         print("=" * 50)
 
         await dp.start_polling(bot, skip_updates=True)
+         # 👇 ВОТ ЭТО НОВОЕ - держит процесс живым
+    print("🔄 Бот запущен, ожидаю события завершения...")
+    await asyncio.Event().wait()  # Бесконечное ожидание
+
 
     except Exception as e:
         print(f"❌ Ошибка запуска: {e}")
