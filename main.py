@@ -1548,7 +1548,7 @@ async def admin_panel_back(callback: CallbackQuery):
 
 
 
-# ===== ИЗМЕНЁННАЯ ФУНКЦИЯ MAIN =====
+# ===== ЗАПУСК =====
 async def main():
     # Восстанавливаем данные
     await restore_data()
@@ -1563,7 +1563,7 @@ async def main():
             lambda s=sig: asyncio.create_task(shutdown(s))
         )
     
-    # 👇 СНАЧАЛА ПРИНУДИТЕЛЬНО УДАЛЯЕМ ВЕБХУК
+    # Удаляем вебхук
     try:
         await bot.delete_webhook()
         print("✅ Вебхук удалён")
@@ -1581,7 +1581,7 @@ async def main():
     print("🧹 Удаление сообщений: Включено")
     print("=" * 50)
 
-       try:
+    try:
         global TON_RUB
         TON_RUB = await get_ton_price()
         print(f"💰 Курс TON: {TON_RUB}₽")
@@ -1599,6 +1599,8 @@ async def main():
         # Запуск поллинга
         print("🔄 Бот запущен, ожидаю события завершения...")
         await dp.start_polling(bot, skip_updates=True)
+        
+        # Бесконечное ожидание (держит процесс живым)
         await asyncio.Event().wait()
 
     except Exception as e:
