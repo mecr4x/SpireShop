@@ -1596,7 +1596,7 @@ async def main():
         print("⏳ Ожидаю сообщений...")
         print("=" * 50)
 
-        # 👇 ВСЁ ЭТО ВНУТРИ ПЕРВОГО TRY
+        # Запуск поллинга
         print("🔄 Бот запущен, ожидаю события завершения...")
         await dp.start_polling(bot, skip_updates=True)
         await asyncio.Event().wait()
