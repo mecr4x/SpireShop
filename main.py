@@ -1596,10 +1596,21 @@ async def main():
         print("⏳ Ожидаю сообщений...")
         print("=" * 50)
 
-        await dp.start_polling(bot, skip_updates=True)
-         # 👇 ВОТ ЭТО НОВОЕ - держит процесс живым
+        # Запускаем polling
+    await dp.start_polling(bot, skip_updates=True)
+
+    # 👇 ЭТА СТРОКА ДОЛЖНА БЫТЬ ВНУТРИ try
     print("🔄 Бот запущен, ожидаю события завершения...")
-    await asyncio.Event().wait()  # Бесконечное ожидание
+    await asyncio.Event().wait()
+
+except Exception as e:
+    # 👇 ЭТОТ БЛОК ДОЛЖЕН БЫТЬ НА ОДНОМ УРОВНЕ С try
+    print(f"❌ Ошибка запуска: {e}")
+    import traceback
+    traceback.print_exc()
+finally:
+    # 👇 И ЭТОТ БЛОК ТОЖЕ НА ОДНОМ УРОВНЕ
+    await bot.session.close()
 
 
     except Exception as e:
