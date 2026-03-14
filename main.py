@@ -1,6 +1,7 @@
 ## main.py - ПОЛНЫЙ КОД С ПРОВЕРКОЙ ПОДПИСКИ
 import sys
 import asyncio
+import signal
 
 # Для Windows
 if sys.platform == 'win32':
