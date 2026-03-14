@@ -1546,6 +1546,39 @@ async def admin_panel_back(callback: CallbackQuery):
     await callback.message.edit_text(text, reply_markup=keyboard, parse_mode="HTML")
     await callback.answer()
 
+# ===== ФУНКЦИЯ ВОССТАНОВЛЕНИЯ ДАННЫХ =====
+async def restore_data():
+    """Восстанавливает данные после перезапуска"""
+    print("🔄 Восстанавливаем данные...")
+    
+    global user_data, user_ids
+    
+    # Проверяем, есть ли сохранённые данные
+    import os
+    import json
+    
+    if os.path.exists("user_data_backup.json"):
+        try:
+            with open("user_data_backup.json", "r") as f:
+                backup = json.load(f)
+                # Преобразуем ключи обратно в int
+                for k, v in backup.items():
+                    user_data[int(k)] = v
+            print(f"✅ Восстановлены данные {len(user_data)} пользователей")
+        except Exception as e:
+            print(f"❌ Ошибка восстановления: {e}")
+    
+    if os.path.exists("user_ids_backup.txt"):
+        try:
+            with open("user_ids_backup.txt", "r") as f:
+                for line in f:
+                    user_ids.add(int(line.strip()))
+            print(f"✅ Восстановлены ID {len(user_ids)} пользователей")
+        except Exception as e:
+            print(f"❌ Ошибка восстановления: {e}")
+    
+    print("🔄 Восстановление завершено")
+
 
 
 # ===== ЗАПУСК =====
