@@ -1582,7 +1582,7 @@ async def restore_data():
 
 # ===== ЗАГЛУШКА ДЛЯ RENDER =====
 async def run_dummy_server():
-    """Заглушка веб-сервера, чтобы Render думал, что есть порт"""
+    """Минимальная заглушка для Render"""
     from aiohttp import web
     
     async def handle(request):
@@ -1590,13 +1590,15 @@ async def run_dummy_server():
     
     app = web.Application()
     app.router.add_get('/', handle)
+    app.router.add_get('/health', handle)  # для проверок
     
-    port = int(os.getenv("PORT", 8000))
+    port = int(os.getenv("PORT", 10000))
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, '0.0.0.0', port)
     await site.start()
-    print(f"✅ Заглушка запущена на порту {port}")
+    print(f"✅ Заглушка на порту {port}")
+    return runner  # возвращаем для возможного закрытия
 
 
 # ===== ЗАПУСК =====
@@ -1604,8 +1606,11 @@ async def main():
     # Восстанавливаем данные
     await restore_data()
 
-    # Запускаем заглушку
+     # Запускаем заглушку (не ждём её)
     asyncio.create_task(run_dummy_server())
+    
+    # Сразу даём команду Render, что порт открыт
+    print(f"✅ Порт {os.getenv('PORT', 10000)} объявлен")
     
     # Получаем текущий цикл событий
     loop = asyncio.get_running_loop()
