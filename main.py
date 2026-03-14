@@ -1580,12 +1580,32 @@ async def restore_data():
     
     print("🔄 Восстановление завершено")
 
+# ===== ЗАГЛУШКА ДЛЯ RENDER =====
+async def run_dummy_server():
+    """Заглушка веб-сервера, чтобы Render думал, что есть порт"""
+    from aiohttp import web
+    
+    async def handle(request):
+        return web.Response(text="Bot is running")
+    
+    app = web.Application()
+    app.router.add_get('/', handle)
+    
+    port = int(os.getenv("PORT", 8000))
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, '0.0.0.0', port)
+    await site.start()
+    print(f"✅ Заглушка запущена на порту {port}")
 
 
 # ===== ЗАПУСК =====
 async def main():
     # Восстанавливаем данные
     await restore_data()
+
+    # Запускаем заглушку
+    asyncio.create_task(run_dummy_server())
     
     # Получаем текущий цикл событий
     loop = asyncio.get_running_loop()
