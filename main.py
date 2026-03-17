@@ -2,6 +2,7 @@
 import sys
 import asyncio
 import signal
+import os 
 
 # Для Windows
 if sys.platform == 'win32':
