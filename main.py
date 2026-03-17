@@ -1610,30 +1610,18 @@ async def main():
     # Восстанавливаем данные
     await restore_data()
 
-     # Запускаем заглушку (не ждём её)
+        # Запускаем заглушку
     asyncio.create_task(run_dummy_server())
     print("🔥 Заглушка запущена в фоне, продолжаю инициализацию бота...")
-    
-    # Сразу даём команду Render, что порт открыт
-    print(f"✅ Порт {os.getenv('PORT', 10000)} объявлен")
-    
-    # Получаем текущий цикл событий
-    loop = asyncio.get_running_loop()
-    
-    # Регистрируем обработчики сигналов
-    for sig in (signal.SIGTERM, signal.SIGINT):
-        loop.add_signal_handler(
-            sig,
-            lambda s=sig: asyncio.create_task(shutdown(s))
-        )
-    
+
     # Удаляем вебхук
     try:
-        await bot.delete_webhook()
+        await bot.delete_webhook(drop_pending_updates=True)
         print("✅ Вебхук удалён")
     except Exception as e:
         print(f"⚠️ Ошибка при удалении вебхука: {e}")
     
+    # Подключаем Telethon
     from username_checker import ensure_client
     await ensure_client()
     print("✅ Telethon готов к работе")
@@ -1660,12 +1648,10 @@ async def main():
         print("⏳ Ожидаю сообщений...")
         print("=" * 50)
 
+        # Запуск поллинга
         print("🔥 Запускаю polling...")
-    await dp.start_polling(bot, skip_updates=True)
-    print("🔥 Polling запущен") # Эта строка выполнится только когда бот остановится
-        
-        # Бесконечное ожидание (держит процесс живым)
-        await asyncio.Event().wait()
+        await dp.start_polling(bot, skip_updates=True)
+        print("🔥 Polling запущен")  # эта строка не выполнится, пока бот работает
 
     except Exception as e:
         print(f"❌❌❌ КРИТИЧЕСКАЯ ОШИБКА: {e}")
@@ -1675,6 +1661,3 @@ async def main():
     finally:
         print("👋 Завершение работы...")
         await bot.session.close()
-
-if __name__ == "__main__":
-    asyncio.run(main())
