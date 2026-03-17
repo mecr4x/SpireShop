@@ -1583,7 +1583,7 @@ async def restore_data():
 
 # ===== ЗАГЛУШКА ДЛЯ RENDER =====
 async def run_dummy_server():
-    """Минимальная заглушка для Render"""
+    print("🔥 Запуск заглушки...")
     from aiohttp import web
     
     async def handle(request):
@@ -1598,17 +1598,21 @@ async def run_dummy_server():
     await runner.setup()
     site = web.TCPSite(runner, '0.0.0.0', port)
     await site.start()
-    print(f"✅ Заглушка на порту {port}")
+    print(f"✅ Заглушка запущена на порту {port}")
     return runner  # возвращаем для возможного закрытия
 
 
 # ===== ЗАПУСК =====
 async def main():
+    print("🔥🔥🔥 ЗАПУСК MAIN()")
+    print(f"🔥 PID: {os.getpid()}")
+    
     # Восстанавливаем данные
     await restore_data()
 
      # Запускаем заглушку (не ждём её)
     asyncio.create_task(run_dummy_server())
+    print("🔥 Заглушка запущена в фоне, продолжаю инициализацию бота...")
     
     # Сразу даём команду Render, что порт открыт
     print(f"✅ Порт {os.getenv('PORT', 10000)} объявлен")
@@ -1656,9 +1660,9 @@ async def main():
         print("⏳ Ожидаю сообщений...")
         print("=" * 50)
 
-        # Запуск поллинга
-        print("🔄 Бот запущен, ожидаю события завершения...")
-        await dp.start_polling(bot, skip_updates=True)
+        print("🔥 Запускаю polling...")
+    await dp.start_polling(bot, skip_updates=True)
+    print("🔥 Polling запущен") # Эта строка выполнится только когда бот остановится
         
         # Бесконечное ожидание (держит процесс живым)
         await asyncio.Event().wait()
