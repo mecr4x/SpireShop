@@ -29,6 +29,12 @@ async def main():
     # Запускаем заглушку
     asyncio.create_task(dummy_server())
     
+    # 👇 ПРИНУДИТЕЛЬНО СБРАСЫВАЕМ ВСЁ
+    await bot.delete_webhook(drop_pending_updates=True)
+    print("✅ Вебхук сброшен")
+    
+    await asyncio.sleep(2)
+    
     print("🚀 Запуск тестового бота...")
     await dp.start_polling(bot)
 
