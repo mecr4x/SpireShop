@@ -1,28 +1,26 @@
 ## main.py - ПОЛНЫЙ КОД С ПРОВЕРКОЙ ПОДПИСКИ
 import sys
+import os
 import asyncio
+import logging
+import time
+import json
 import signal
-import os 
+import traceback
 
 # Для Windows
 if sys.platform == 'win32':
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-import logging
-import time
 
 import aiohttp
-import re
-from aiogram import Bot, Dispatcher, Router, F, types
+from aiogram import Bot, Dispatcher, Router, F
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, FSInputFile
-from aiogram.filters import Command
+from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.client.default import DefaultBotProperties
-from aiogram.filters import StateFilter  # добавь это к другим импортам
 from aiohttp import web
-import json
-import time
 
 # ===== КОНФИГУРАЦИЯ =====
 BOT_TOKEN = "8236812443:AAGsoEmE7u9q5eBpKTQ3vlbp4IregP9-oHY"
@@ -1548,28 +1546,19 @@ async def admin_panel_back(callback: CallbackQuery):
     await callback.message.edit_text(text, reply_markup=keyboard, parse_mode="HTML")
     await callback.answer()
 
-# ===== ФУНКЦИЯ ВОССТАНОВЛЕНИЯ ДАННЫХ =====
+# ===== ФУНКЦИЯ ВОССТАНОВЛЕНИЯ =====
 async def restore_data():
-    """Восстанавливает данные после перезапуска"""
     print("🔄 Восстанавливаем данные...")
-    
     global user_data, user_ids
-    
-    # Проверяем, есть ли сохранённые данные
-    import os
-    import json
-    
     if os.path.exists("user_data_backup.json"):
         try:
             with open("user_data_backup.json", "r") as f:
                 backup = json.load(f)
-                # Преобразуем ключи обратно в int
                 for k, v in backup.items():
                     user_data[int(k)] = v
             print(f"✅ Восстановлены данные {len(user_data)} пользователей")
         except Exception as e:
             print(f"❌ Ошибка восстановления: {e}")
-    
     if os.path.exists("user_ids_backup.txt"):
         try:
             with open("user_ids_backup.txt", "r") as f:
@@ -1578,21 +1567,35 @@ async def restore_data():
             print(f"✅ Восстановлены ID {len(user_ids)} пользователей")
         except Exception as e:
             print(f"❌ Ошибка восстановления: {e}")
-    
     print("🔄 Восстановление завершено")
+
+# ===== ФУНКЦИЯ ЗАВЕРШЕНИЯ =====
+async def shutdown(sig: signal.Signals):
+    print(f"\n⚠️ Получен сигнал {sig.name}. Завершаем работу...")
+    try:
+        if user_data:
+            with open("user_data_backup.json", "w") as f:
+                backup = {str(k): v for k, v in user_data.items()}
+                json.dump(backup, f, indent=2)
+            print(f"✅ Сохранены данные {len(user_data)} пользователей")
+    except Exception as e:
+        print(f"❌ Ошибка сохранения: {e}")
+    try:
+        await dp.stop_polling()
+        print("✅ Поллинг остановлен")
+    except Exception as e:
+        print(f"❌ Ошибка остановки: {e}")
+    await bot.session.close()
+    print("👋 Бот остановлен")
 
 # ===== ЗАГЛУШКА ДЛЯ RENDER =====
 async def run_dummy_server():
-    """Минимальная заглушка для Render"""
     from aiohttp import web
-    
     async def handle(request):
         return web.Response(text="Bot is running")
-    
     app = web.Application()
     app.router.add_get('/', handle)
     app.router.add_get('/health', handle)
-    
     port = int(os.getenv("PORT", 10000))
     runner = web.AppRunner(app)
     await runner.setup()
