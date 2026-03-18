@@ -1583,7 +1583,7 @@ async def restore_data():
 
 # ===== ЗАГЛУШКА ДЛЯ RENDER =====
 async def run_dummy_server():
-    print("🔥 Запуск заглушки...")
+    """Минимальная заглушка для Render"""
     from aiohttp import web
     
     async def handle(request):
@@ -1591,29 +1591,34 @@ async def run_dummy_server():
     
     app = web.Application()
     app.router.add_get('/', handle)
-    app.router.add_get('/health', handle)  # для проверок
+    app.router.add_get('/health', handle)
     
     port = int(os.getenv("PORT", 10000))
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, '0.0.0.0', port)
     await site.start()
-    print(f"✅ Заглушка запущена на порту {port}")
-    return runner  # возвращаем для возможного закрытия
-
+    print(f"✅ Заглушка на порту {port}")
+    return runner
 
 # ===== ЗАПУСК =====
 async def main():
-    print("🔥🔥🔥 ЗАПУСК MAIN()")
-    print(f"🔥 PID: {os.getpid()}")
+    # Запускаем заглушку в фоне
+    asyncio.create_task(run_dummy_server())
     
     # Восстанавливаем данные
     await restore_data()
-
-        # Запускаем заглушку
-    asyncio.create_task(run_dummy_server())
-    print("🔥 Заглушка запущена в фоне, продолжаю инициализацию бота...")
-
+    
+    # Получаем текущий цикл событий
+    loop = asyncio.get_running_loop()
+    
+    # Регистрируем обработчики сигналов
+    for sig in (signal.SIGTERM, signal.SIGINT):
+        loop.add_signal_handler(
+            sig,
+            lambda s=sig: asyncio.create_task(shutdown(s))
+        )
+    
     # Удаляем вебхук
     try:
         await bot.delete_webhook(drop_pending_updates=True)
@@ -1621,7 +1626,6 @@ async def main():
     except Exception as e:
         print(f"⚠️ Ошибка при удалении вебхука: {e}")
     
-    # Подключаем Telethon
     from username_checker import ensure_client
     await ensure_client()
     print("✅ Telethon готов к работе")
@@ -1633,31 +1637,25 @@ async def main():
     print("🧹 Удаление сообщений: Включено")
     print("=" * 50)
 
+    global TON_RUB
+    TON_RUB = await get_ton_price()
+    print(f"💰 Курс TON: {TON_RUB}₽")
+
+    me = await bot.get_me()
+    print(f"✅ Бот: @{me.username}")
+
+    print("=" * 50)
+    print("📋 Команды:")
+    print("/start /menu /stars /ton /premium")
+    print("=" * 50)
+    print("⏳ Ожидаю сообщений...")
+    print("=" * 50)
+
+    # ЗАПУСК ПОЛЛИНГА
+    await dp.start_polling(bot, skip_updates=True)
+
+if __name__ == "__main__":
     try:
-        global TON_RUB
-        TON_RUB = await get_ton_price()
-        print(f"💰 Курс TON: {TON_RUB}₽")
-
-        me = await bot.get_me()
-        print(f"✅ Бот: @{me.username}")
-
-        print("=" * 50)
-        print("📋 Команды:")
-        print("/start /menu /stars /ton /premium")
-        print("=" * 50)
-        print("⏳ Ожидаю сообщений...")
-        print("=" * 50)
-
-        # Запуск поллинга
-        print("🔥 Запускаю polling...")
-        await dp.start_polling(bot, skip_updates=True)
-        print("🔥 Polling запущен")  # эта строка не выполнится, пока бот работает
-
-    except Exception as e:
-        print(f"❌❌❌ КРИТИЧЕСКАЯ ОШИБКА: {e}")
-        import traceback
-        traceback.print_exc()
-
-    finally:
-        print("👋 Завершение работы...")
-        await bot.session.close()
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("👋 Бот остановлен")
