@@ -1605,14 +1605,16 @@ async def run_dummy_server():
 async def main():
     # Запускаем заглушку в фоне
     asyncio.create_task(run_dummy_server())
+    print("🔥 Заглушка запущена")
     
     # Восстанавливаем данные
     await restore_data()
+    print("🔥 Данные восстановлены")
     
-    # Получаем текущий цикл событий
+    # Получаем цикл событий
     loop = asyncio.get_running_loop()
     
-    # Регистрируем обработчики сигналов
+    # Обработчики сигналов
     for sig in (signal.SIGTERM, signal.SIGINT):
         loop.add_signal_handler(
             sig,
@@ -1626,6 +1628,7 @@ async def main():
     except Exception as e:
         print(f"⚠️ Ошибка при удалении вебхука: {e}")
     
+    # Подключаем Telethon
     from username_checker import ensure_client
     await ensure_client()
     print("✅ Telethon готов к работе")
@@ -1637,10 +1640,12 @@ async def main():
     print("🧹 Удаление сообщений: Включено")
     print("=" * 50)
 
+    # Получаем курс TON
     global TON_RUB
     TON_RUB = await get_ton_price()
     print(f"💰 Курс TON: {TON_RUB}₽")
 
+    # Получаем информацию о боте
     me = await bot.get_me()
     print(f"✅ Бот: @{me.username}")
 
@@ -1654,8 +1659,12 @@ async def main():
     # ЗАПУСК ПОЛЛИНГА
     await dp.start_polling(bot, skip_updates=True)
 
+# ===== ТОЧКА ВХОДА =====
 if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
         print("👋 Бот остановлен")
+    except Exception as e:
+        print(f"❌ Критическая ошибка: {e}")
+        traceback.print_exc()
