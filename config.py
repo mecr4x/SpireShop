@@ -21,7 +21,7 @@ CRYPTOBOT_API = 'https://pay.crypt.bot/api'
 TON_API = 'https://tonapi.io/v2'
 
 # Проверка токена
-if not BOT_TOKEN or "ВСТАВЬТЕ_ВАШ_ТОКЕН" in BOT_TOKEN:
+if not BOT_TOKEN or "8236812443:AAGsoEmE7u9q5eBpKTQ3vlbp4IregP9-oHY" in BOT_TOKEN:
     print("\n" + "="*60)
     print("❌ ВНИМАНИЕ: Токен бота не указан!")
     print("="*60)
