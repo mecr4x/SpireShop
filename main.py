@@ -1353,42 +1353,34 @@ async def sbp_payment(callback: CallbackQuery):
     description = f"Оплата {amount}₽"
     base_price = amount
     final_amount = amount
-
-    if ptype == "stars":
-    quantity = stars_data.get('star_value', '?')
-elif ptype == "premium":
-    quantity = premium_data.get('period', 'Premium')
-elif ptype == "ton":
-    quantity = ton_data.get('ton_value', '?')
-else:
-    quantity = "1"
+    quantity = 1
 
     # Определяем описание и разделяем цены для каждого типа товара
-    if ptype == "stars" and stars_data:
-        star_value = stars_data.get('star_value', '?')
-        description = f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> {star_value} звёзд"
+     if ptype == "stars" and stars_data:
+        quantity = stars_data.get('star_value', '?')
+        description = f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> {quantity} звёзд"
         base_price = round(star_value * 1.65, 1)  # ТВОЯ ЦЕНА: 1.7 за звезду
         final_amount = round(base_price / 0.92, 1)
 
-    elif ptype == "premium" and premium_data:
-        period = premium_data.get('period', 'Premium')
+  elif ptype == "premium" and premium_data:
+        quantity = premium_data.get('period', 'Premium')
         priceprem = premium_data.get('priceprem', amount)
-        print(f"👑 Premium данные: period={period}, priceprem={priceprem}")
+        print(f"👑 Premium данные: period={quantity}, priceprem={priceprem}")
 
-        description = f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> Telegram Premium на {period}"
+        description = f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> Telegram Premium на {quantity}"
         # ТВОИ ЦЕНЫ
         base_prices = {
-            "12 месяцев": 3000,
-            "6 месяцев": 1700,
-            "3 месяца": 1300
+            "12 месяцев": 2999,
+            "6 месяцев": 1699,
+            "3 месяца": 1299
         }
         base_price = base_prices.get(period, priceprem)
         final_amount = round(base_price / 0.92, 1)
 
-    elif ptype == "ton" and ton_data:
-        ton_value = ton_data.get('ton_value', '?')
-        description = f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> {ton_value} TON"
-        base_price = round(ton_value * (TON_RUB + 20), 1)  # ТВОЙ КУРС: TON_RUB + 30
+   elif ptype == "ton" and ton_data:
+        quantity = ton_data.get('ton_value', '?')
+        description = f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> {quantity} TON"
+        base_price = round(ton_value * (TON_RUB + 30), 1)  # ТВОЙ КУРС: TON_RUB + 30
         final_amount = round(base_price / 0.92, 1)
 
     order_id = f"{ptype}_{user_id}_{int(time.time())}"
