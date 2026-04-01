@@ -28,32 +28,19 @@ BOT_USERNAME = "spireshoptgbot"
 username_cache = {}
 CACHE_TIME = 300  # 5 минут
 
-# ===== TELETHON КЛИЕНТ =====
+# ===== СОЗДАЁМ КЛИЕНТА С STRING SESSION =====
 client = TelegramClient(StringSession(STRING_SESSION), API_ID, API_HASH)
 client_ready = False
 
 async def ensure_client():
-    """Подключает клиента Telethon если ещё не подключен"""
     global client_ready
     if not client_ready:
-        try:
-            print("🔄 Подключение к Telethon...")
-            await client.connect()
-            
-            if not await client.is_user_authorized():
-                # Если сессия не работает - пробуем заново
-                await client.start(phone=PHONE, password=PASSWORD)
-            
-            client_ready = True
-            me = await client.get_me()
-            print(f"✅ Telethon готов! Аккаунт: @{me.username}")
-        except Exception as e:
-            print(f"❌ Ошибка подключения Telethon: {e}")
-            client_ready = False
+        await client.connect()
+        client_ready = True
+        print("✅ Telethon готов (по строковой сессии)")
     return client_ready
 
 async def check_username(username: str) -> dict:
-    """Проверяет существование username в Telegram"""
     clean_username = username.strip().replace('@', '')
     if not clean_username:
         return {'exists': False, 'error': '❌ Пустой username'}
@@ -62,10 +49,8 @@ async def check_username(username: str) -> dict:
     if clean_username in username_cache:
         data, timestamp = username_cache[clean_username]
         if time.time() - timestamp < CACHE_TIME:
-            print(f"📦 Кэш: @{clean_username}")
             return data
 
-    print(f"🔍 Проверка: @{clean_username}")
     try:
         await ensure_client()
         user = await client.get_entity(clean_username)
@@ -74,11 +59,7 @@ async def check_username(username: str) -> dict:
             'exists': True,
             'user_id': user.id,
             'username': user.username,
-            'first_name': getattr(user, 'first_name', ''),
-            'last_name': getattr(user, 'last_name', ''),
-            'premium': getattr(user, 'premium', False),
-            'bot': user.bot if hasattr(user, 'bot') else False,
-            'verified': getattr(user, 'verified', False)
+            'premium': getattr(user, 'premium', False)
         }
 
         username_cache[clean_username] = (result, time.time())
@@ -86,9 +67,8 @@ async def check_username(username: str) -> dict:
 
     except UsernameInvalidError:
         return {'exists': False, 'error': '❌ Пользователь не найден'}
-    except FloodWaitError as e:
-        return {'exists': False, 'error': f'❌ Слишком много запросов, подождите {e.seconds}с'}
-    except Exception:
+    except Exception as e:
+        print(f"❌ Ошибка проверки: {e}")
         return {'exists': False, 'error': '❌ Пользователь не найден'}
 
 
