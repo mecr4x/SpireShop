@@ -281,7 +281,7 @@ async def process_stars_amount(message: Message, state: FSMContext):
             return
 
         # Расчет стоимости
-        formulastar = round(star_value * 1.5, 1)
+        formulastar = round(star_value * 1.65, 1)
 
         # Сохраняем данные
         save_user_data(message.from_user.id, "stars", {
@@ -551,7 +551,7 @@ async def ton_cmd(message: Message, state: FSMContext):
 
     text = (
         f"<tg-emoji emoji-id=\"5438332129006081114\">💎</tg-emoji><b>TON</b>\n\n"
-        f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Курс к рублю:</b> {round(TON_RUB + 20, 2)}₽\n"
+        f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Курс к рублю:</b> {round(TON_RUB + 25, 2)}₽\n"
         f"<tg-emoji emoji-id=\"5447644880824181073\">⚠️</tg-emoji>️<b>Примечание:</b> TON поступает не на кошелек, а на Telegram аккаунт по @username."
         f"Использовать TON можно <b>только</b> в качестве покупки подарков на Telegram маркете, "
         f"а так же для оплаты за посты в Telegram каналах!\n\n"
@@ -820,9 +820,9 @@ async def premium_period_callback(callback: CallbackQuery, state: FSMContext):
     }
 
     prices = {
-        "premium_12": 2800,
-        "premium_6": 1500,
-        "premium_3": 1200
+        "premium_12": 30000,
+        "premium_6": 1700,
+        "premium_3": 1300
     }
 
     period = periods.get(callback.data, "3 месяца")
@@ -1128,13 +1128,13 @@ async def crypto_payment(callback: CallbackQuery):
     if ptype == "stars" and stars_data:
         star_value = stars_data.get('star_value', '?')
         description = f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> {star_value} звёзд"
-        base_price = round(star_value * 1.5, 1)
+        base_price = round(star_value * 1.65, 1)
         commission = round(amount - base_price, 1)
 
     elif ptype == "premium" and premium_data:
         period = premium_data.get('period', 'Premium')
         description = f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> Telegram Premium на {period}"
-        base_prices = {"12 месяцев": 2800, "6 месяцев": 1500, "3 месяца": 1200}
+        base_prices = {"12 месяцев": 3000, "6 месяцев": 1700, "3 месяца": 1300}
         base_price = base_prices.get(period, amount)
         commission = round(amount - base_price, 1)
 
@@ -1298,7 +1298,7 @@ async def sbp_payment(callback: CallbackQuery):
     if ptype == "stars" and stars_data:
         star_value = stars_data.get('star_value', '?')
         description = f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> {star_value} звёзд"
-        base_price = round(star_value * 1.5, 1)  # ТВОЯ ЦЕНА: 1.7 за звезду
+        base_price = round(star_value * 1.65, 1)  # ТВОЯ ЦЕНА: 1.7 за звезду
         final_amount = round(base_price / 0.92, 1)
 
     elif ptype == "premium" and premium_data:
@@ -1309,9 +1309,9 @@ async def sbp_payment(callback: CallbackQuery):
         description = f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> Telegram Premium на {period}"
         # ТВОИ ЦЕНЫ
         base_prices = {
-            "12 месяцев": 2800,
-            "6 месяцев": 1500,
-            "3 месяца": 1200
+            "12 месяцев": 3000,
+            "6 месяцев": 1700,
+            "3 месяца": 1300
         }
         base_price = base_prices.get(period, priceprem)
         final_amount = round(base_price / 0.92, 1)
