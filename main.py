@@ -333,7 +333,7 @@ async def process_stars_amount(message: Message, state: FSMContext):
     try:
         star_value = int(message.text.strip())
 
-        if star_value < 50 or star_value > 1000000:
+        if star_value < 1 or star_value > 1000000:
             error_msg = await message.answer("❌ Количество должно быть от 50 до 1,000,000")
             await save_and_delete_previous(message.from_user.id, error_msg.message_id)
             await asyncio.sleep(2)
