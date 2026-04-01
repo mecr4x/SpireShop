@@ -1233,7 +1233,7 @@ async def crypto_payment(callback: CallbackQuery):
         text = (
             f"<tg-emoji emoji-id=\"5361914370068613491\">👛</tg-emoji><b>CryptoBot</b>\n\n"
             f"{description}\n"
-            f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Сумма:</b> {round(amount, 1)}₽ (комиссия {round(commission, 2)}₽)\n"
+            f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Сумма:</b> {round(amount/0.97, 1)}₽ (комиссия {round(commission, 2)}₽)\n"
             f"<tg-emoji emoji-id=\"5274099962655816924\">❗️</tg-emoji><b>Комиссия:</b>3%\n\n"
             f"👇Нажмите кнопку для оплаты:"
         )
@@ -1353,6 +1353,15 @@ async def sbp_payment(callback: CallbackQuery):
     description = f"Оплата {amount}₽"
     base_price = amount
     final_amount = amount
+
+    if ptype == "stars":
+    quantity = stars_data.get('star_value', '?')
+elif ptype == "premium":
+    quantity = premium_data.get('period', 'Premium')
+elif ptype == "ton":
+    quantity = ton_data.get('ton_value', '?')
+else:
+    quantity = "1"
 
     # Определяем описание и разделяем цены для каждого типа товара
     if ptype == "stars" and stars_data:
