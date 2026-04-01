@@ -13,6 +13,57 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.client.default import DefaultBotProperties
+from aiohttp import web
+import json
+
+# ===== ХРАНИЛИЩЕ ДЛЯ ВЕБХУКА =====
+processed_webhooks = set()
+
+# ===== ВЕБХУК ДЛЯ PLATEGA =====
+async def platega_webhook(request):
+    try:
+        data = await request.json()
+        print(f"📩 Platega webhook: {json.dumps(data, indent=2)}")
+        
+        transaction_id = data.get('transactionId')
+        status = data.get('status')
+        payload = data.get('payload', '')
+        
+        if transaction_id in processed_webhooks:
+            return web.Response(text="OK", status=200)
+        processed_webhooks.add(transaction_id)
+        
+        if status == 'SUCCESS' and payload:
+            parts = payload.split('_')
+            if len(parts) >= 2:
+                user_id = int(parts[1])
+                ptype = parts[0]
+                amount = data.get('paymentDetails', {}).get('amount', 0)
+                
+                # Уведомление пользователю
+                await bot.send_message(
+                    user_id,
+                    f"✅ Оплата подтверждена!\n"
+                    f"Спасибо за покупку ждем вас снова в SpireShop!"
+                )
+                
+                # Уведомление админу
+                await bot.send_message(
+                    ADMIN_ID,
+                    f"Новый платёж!\nПользователь: {user_id}\nТовар: {ptype}\nСумма: {amount}₽"
+                )
+        
+        return web.Response(text="OK")
+    except Exception as e:
+        print(f"❌ Ошибка webhook: {e}")
+        return web.Response(text="Error", status=500)
+
+# ===== РЕГИСТРАЦИЯ ОБРАБОТЧИКА (Bothost сам вызовет) =====
+def create_app():
+    """Создаёт приложение для веб-сервера Bothost"""
+    app = web.Application()
+    app.router.add_post('/webhook/platega', platega_webhook)
+    return app
 # Создаём роутер
 router = Router()
 
@@ -99,6 +150,15 @@ async def require_subscription_callback(callback: CallbackQuery) -> bool:
         )
         return False
     return True
+
+# ===== ЦЕНЫ (можно менять через админку) =====
+PRICES = {
+    "stars": 1.65,           # цена за звезду
+    "premium_12": 2999,
+    "premium_6": 1699,
+    "premium_3": 1299,
+    "ton_markup": 30,       # наценка на TON
+}
 
 
 # ===== СОСТОЯНИЯ =====
@@ -1328,14 +1388,22 @@ async def sbp_payment(callback: CallbackQuery):
 
     from username_checker import create_platega_invoice
 
-    # Простое описание для Platega (без эмодзи)
-    platega_description = f"{ptype.upper()} {round(final_amount, 1)}₽"
+     # Формируем payload для вебхука (тип_количество_сумма_получатель)
+    payload = f"{ptype}_{quantity}_{round(final_amount, 1)}_{username}"
+
+    wait_msg = await callback.message.answer("Создаю ссылку для оплаты...")
+
+    from username_checker import create_platega_invoice
+
+    # Описание для Platega
+    platega_description = f"Спасибо за покупку! Ждем вас снова в SpireShop"
 
     result = await create_platega_invoice(
         amount_rub=final_amount,
         description=platega_description,
-        order_id=order_id
+        order_id=payload  # 👈 payload передаётся в order_id
     )
+
 
     await delete_user_message(user_id, wait_msg.message_id)
 
@@ -1345,13 +1413,11 @@ async def sbp_payment(callback: CallbackQuery):
             f"{description}\n"
             f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Сумма к оплате:</b> {round(final_amount, 1)}₽ (комиссия {round(final_amount - base_price, 1)}₽)\n"
             f"<tg-emoji emoji-id=\"5274099962655816924\">❗️</tg-emoji><b>Комиссия сервиса:</b> 8%\n\n"
-            f"👇 Нажмите кнопку для оплаты, а после подтвердите оплату, нажав на \"<tg-emoji emoji-id=\"5206607081334906820\">✔️</tg-emoji>Оплатил\""
+            f"👇Нажмите кнопку для оплаты:""
         )
 
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="Оплатить", url=result["pay_url"])],
-            [InlineKeyboardButton(text="Оплатил", callback_data=f"paid_{ptype}_{final_amount}_{username}",
-                                  icon_custom_emoji_id=5206607081334906820)],
             [InlineKeyboardButton(text="❌Отмена", callback_data=ptype)]
         ])
 
@@ -1362,62 +1428,6 @@ async def sbp_payment(callback: CallbackQuery):
 
     await callback.answer()
 
-
-# ===== КНОПКА "Я ОПЛАТИЛ" =====
-@router.callback_query(F.data.startswith("paid_"))
-async def paid_callback(callback: CallbackQuery):
-    # 👇 ПРОВЕРКА ПОДПИСКИ
-    if not await require_subscription_callback(callback):
-        return
-
-    user_id = callback.from_user.id
-    parts = callback.data.split("_")
-
-    if len(parts) >= 5:  # формат: paid_тип_количество_сумма_получатель
-        ptype = parts[1]  # stars, premium, ton
-        quantity = parts[2]  # количество
-        amount = parts[3]  # сумма
-        recipient = parts[4]  # получатель (@username или id)
-
-        await delete_user_message(user_id, callback.message.message_id)
-
-        # Название товара на русском
-        product_names = {
-            "stars": "Звёзды",
-            "premium": "Premium",
-            "ton": "TON"
-        }
-        product_name = product_names.get(ptype, ptype.upper())
-
-        # Формируем текст заказа
-        order_text = (
-            f"💰 <b>НОВЫЙ ЗАКАЗ</b>\n\n"
-            f"🎁 <b>Получатель:</b> {recipient}\n"
-            f"📦 <b>Товар:</b> {product_name}\n"
-            f"🔢 <b>Количество:</b> {quantity}\n"
-            f"💵 <b>Сумма:</b> {amount}₽\n"
-            f"⏱ <b>Время оплаты:</b> {time.strftime('%Y-%m-%d %H:%M:%S')}"
-        )
-
-        # 👇 ОТПРАВЛЯЕМ ТЕБЕ В ЛИЧКУ
-        await callback.bot.send_message(
-            chat_id=ADMIN_ID,  # твой Telegram ID (число)
-            text=order_text,
-            parse_mode="HTML"
-        )
-
-        # Благодарность покупателю
-        await callback.message.answer(
-            f"<b>Спасибо за покупку!</b>\n\n"
-            f"Ваш заказ принят и передан администратору.\n"
-            f"Ждем вас снова в SpireShop<tg-emoji emoji-id=\"5368469082867769478\">😘</tg-emoji>"
-        )
-
-        await callback.answer("✅ Заказ отправлен")
-    else:
-        await callback.answer("❌ Ошибка данных", show_alert=True)
-
-
 # ===== АДМИН-ПАНЕЛЬ =====
 @router.message(Command("admin"))
 async def admin_panel(message: Message):
@@ -1427,18 +1437,14 @@ async def admin_panel(message: Message):
         return
 
     text = (
-        f"<b>👑 АДМИН-ПАНЕЛЬ</b>\n\n"
-        f"👥 <b>Всего пользователей:</b> {len(user_ids)}\n"
-        f"🆔 <b>Ваш ID:</b> <code>{ADMIN_ID}</code>\n\n"
+        f"<b> АДМИН-ПАНЕЛЬ</b>\n\n"
         f"Выберите действие:"
     )
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="📢 Сделать рассылку", callback_data="admin_broadcast")],
-        [InlineKeyboardButton(text="📦 Последние заказы", callback_data="admin_orders")],
-        [InlineKeyboardButton(text="📊 Статистика", callback_data="admin_stats")],
-        [InlineKeyboardButton(text="⚙️ Изменить цены", callback_data="admin_prices")],
-        [InlineKeyboardButton(text="❌ Закрыть", callback_data="menu")]
+        [InlineKeyboardButton(text="Сделать рассылку", callback_data="admin_broadcast")],
+        [InlineKeyboardButton(text="Изменить цены", callback_data="admin_prices")],
+        [InlineKeyboardButton(text="Закрыть", callback_data="menu")]
     ])
 
     await message.answer(text, reply_markup=keyboard, parse_mode="HTML")
@@ -1450,125 +1456,113 @@ async def admin_broadcast(callback: CallbackQuery, state: FSMContext):
     if callback.from_user.id != ADMIN_ID:
         await callback.answer("❌ Нет доступа", show_alert=True)
         return
-
+    
     await callback.message.edit_text(
-        f"<b>📢 РАССЫЛКА</b>\n\n"
-        f"👥 Всего пользователей: {len(user_ids)}\n\n"
+        f"<b>РАССЫЛКА</b>\n\n"
+        f"Всего пользователей: {len(user_ids)}\n\n"
         f"Введите текст для рассылки (можно использовать HTML):"
     )
-
+    
     await state.set_state("waiting_broadcast_text")
     await callback.answer()
-
 
 @router.message(StateFilter("waiting_broadcast_text"))
 async def process_broadcast(message: Message, state: FSMContext):
     if message.from_user.id != ADMIN_ID:
         await state.clear()
         return
-
+    
     text = message.html_text
-
-    status_msg = await message.answer(f"📢 Начинаю рассылку {len(user_ids)} пользователям...\n⏳ Пожалуйста, подождите")
-
+    
+    status_msg = await message.answer(f"📢 Начинаю рассылку {len(user_ids)} пользователям...")
+    
     sent = 0
     failed = 0
-
+    
     for user_id in user_ids:
         try:
             await bot.send_message(user_id, text, parse_mode="HTML")
             sent += 1
-            if sent % 10 == 0:  # обновляем статус каждые 10 сообщений
-                await status_msg.edit_text(f"📢 Отправлено: {sent}/{len(user_ids)}\n❌ Ошибок: {failed}")
-            await asyncio.sleep(0.05)  # задержка чтобы не забанили
+            if sent % 10 == 0:
+                await status_msg.edit_text(f"📢 Отправлено: {sent}/{len(user_ids)}")
+            await asyncio.sleep(0.05)
         except Exception as e:
             failed += 1
-            print(f"❌ Ошибка отправки пользователю {user_id}: {e}")
-
+            print(f"❌ Ошибка отправки {user_id}: {e}")
+    
     await status_msg.edit_text(
-        f"<b>✅ Рассылка завершена!</b>\n\n"
-        f"📨 Отправлено: {sent}\n"
-        f"❌ Не удалось: {failed}\n"
-        f"👥 Всего: {len(user_ids)}",
+        f"<b>Рассылка завершена!</b>\n\n"
+        f"Отправлено: {sent}\n"
+        f" Не удалось: {failed}\n"
+        f" Всего: {len(user_ids)}",
         parse_mode="HTML"
     )
-
+    
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🔙 Назад в админку", callback_data="admin_panel_back")]
+        [InlineKeyboardButton(text="🔙 Назад в админку", callback_data="admin_back")]
     ])
     await message.answer("Что дальше?", reply_markup=keyboard)
     await state.clear()
 
 
-@router.callback_query(F.data == "admin_orders")
-async def admin_orders(callback: CallbackQuery):
-    if callback.from_user.id != ADMIN_ID:
-        await callback.answer("❌ Нет доступа", show_alert=True)
+@router.message(StateFilter("waiting_price_change"))
+async def change_price(message: Message, state: FSMContext):
+    if message.from_user.id != ADMIN_ID:
+        await state.clear()
         return
+    
+    try:
+        parts = message.text.strip().split()
+        if len(parts) != 2:
+            raise ValueError
+        
+        key = parts[0]
+        value = float(parts[1])
+        
+        if key in PRICES:
+            PRICES[key] = value
+            await message.answer(f"✅ Цена <b>{key}</b> изменена на {value}₽", parse_mode="HTML")
+            
+            # Обновляем глобальные переменные, которые используют цены
+            global formulastar, priceprem, TON_RUB
+            # Здесь можно обновить и другие переменные, если нужно
+            
+        else:
+            await message.answer(f"❌ Неизвестный товар: {key}\nДоступно: {', '.join(PRICES.keys())}")
+            
+    except:
+        await message.answer("❌ Неверный формат\nПример: <code>stars 1.7</code>", parse_mode="HTML")
+    
+    await state.clear()
 
-    # Здесь можно показать последние заказы из БД
-    # Пока заглушка
-    text = (
-        f"<b>📦 ПОСЛЕДНИЕ ЗАКАЗЫ</b>\n\n"
-        f"🔜 Функция в разработке\n\n"
-        f"Скоро здесь будет история заказов"
-    )
-
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🔙 Назад", callback_data="admin_panel_back")]
-    ])
-
-    await callback.message.edit_text(text, reply_markup=keyboard, parse_mode="HTML")
-    await callback.answer()
-
-
-@router.callback_query(F.data == "admin_stats")
-async def admin_stats(callback: CallbackQuery):
-    if callback.from_user.id != ADMIN_ID:
-        await callback.answer("❌ Нет доступа", show_alert=True)
-        return
-
-    # Подсчет статистики
-    total_users = len(user_ids)
-
-    text = (
-        f"<b>📊 СТАТИСТИКА</b>\n\n"
-        f"👥 <b>Всего пользователей:</b> {total_users}\n"
-        f"💰 <b>Всего заказов:</b> {len(user_data)}\n"
-        f"⏱ <b>Время работы:</b> 24/7\n"
-    )
-
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🔙 Назад", callback_data="admin_panel_back")]
-    ])
-
-    await callback.message.edit_text(text, reply_markup=keyboard, parse_mode="HTML")
-    await callback.answer()
 
 
 @router.callback_query(F.data == "admin_prices")
-async def admin_prices(callback: CallbackQuery):
+async def admin_prices(callback: CallbackQuery, state: FSMContext):
     if callback.from_user.id != ADMIN_ID:
         await callback.answer("❌ Нет доступа", show_alert=True)
         return
-
+    
     text = (
-        f"<b>⚙️ ТЕКУЩИЕ ЦЕНЫ</b>\n\n"
-        f"⭐️ <b>Stars:</b> 1.5₽ за звезду\n"
-        f"👑 <b>Premium 12 мес:</b> 2800₽\n"
-        f"👑 <b>Premium 6 мес:</b> 1500₽\n"
-        f"👑 <b>Premium 3 мес:</b> 1200₽\n"
-        f"💎 <b>TON:</b> TON_RUB + 20₽\n\n"
-        f"🔜 Изменение цен скоро будет доступно"
+        f"<b>ТЕКУЩИЕ ЦЕНЫ</b>\n\n"
+        f"<b>Stars:</b> {PRICES['stars']}₽ за звезду\n"
+        f"<b>Premium 12 мес:</b> {PRICES['premium_12']}₽\n"
+        f"<b>Premium 6 мес:</b> {PRICES['premium_6']}₽\n"
+        f"<b>Premium 3 мес:</b> {PRICES['premium_3']}₽\n"
+        f"<b>TON наценка:</b> +{PRICES['ton_markup']}₽\n\n"
+        f" <b>Как изменить:</b>\n"
+        f"<code>stars 1.7</code> — изменить цену звезды\n"
+        f"<code>premium_12 3000</code> — изменить Premium 12 мес\n"
+        f"<code>ton_markup 25</code> — изменить наценку TON"
     )
-
+    
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🔙 Назад", callback_data="admin_panel_back")]
+        [InlineKeyboardButton(text="🔙 Назад", callback_data="admin_back")]
     ])
-
+    
     await callback.message.edit_text(text, reply_markup=keyboard, parse_mode="HTML")
+    await state.set_state("waiting_price_change")
     await callback.answer()
-
 
 @router.callback_query(F.data == "admin_panel_back")
 async def admin_panel_back(callback: CallbackQuery):
