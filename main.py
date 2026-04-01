@@ -1413,7 +1413,7 @@ async def sbp_payment(callback: CallbackQuery):
             f"{description}\n"
             f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Сумма к оплате:</b> {round(final_amount, 1)}₽ (комиссия {round(final_amount - base_price, 1)}₽)\n"
             f"<tg-emoji emoji-id=\"5274099962655816924\">❗️</tg-emoji><b>Комиссия сервиса:</b> 8%\n\n"
-            f"👇Нажмите кнопку для оплаты:""
+            f"👇Нажмите кнопку для оплаты:"
         )
 
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
