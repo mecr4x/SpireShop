@@ -33,7 +33,7 @@ async def save_all_users_callback(callback: CallbackQuery):
     user_ids.add(callback.from_user.id)
 
 # ===== КОНФИГУРАЦИЯ =====
-BOT_TOKEN = "8236812443:AAGa3VCHldDpzLJbK6U7VBOncnmbHIanFYI"
+BOT_TOKEN = "8236812443:AAHgQEWDwQMDAHhv8sIRxhKqmsToX9Rn85c"
 ADMIN_ID = 887261650
 ADMIN_CHANNEL = '@spireshop01'  # канал для подписки
 SUPPORT_USERNAME = '@adamyan_ss'
