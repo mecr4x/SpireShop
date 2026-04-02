@@ -1492,6 +1492,17 @@ async def sbp_payment(callback: CallbackQuery):
         base_price = round(star_value * 1.65, 1)
         final_amount = round(base_price / 0.92, 1)
 
+    elif ptype == "gift" and gift_data:
+        gift_id = gift_data.get('gift_id')
+        gift_name = gift_data.get('name')
+        description = f"<tg-emoji emoji-id=\"5380006756594243067\">💎</tg-emoji><b>Подарок: {gift_name}</b>"
+        base_price = gift_data.get('price')
+        final_amount = round(base_price / 0.92, 1)
+        quantity = "1"
+    
+    # Payload: gift_IDподарка_сумма_получатель
+    payload = f"gift_{gift_id}_{round(final_amount, 1)}_{recipient}"
+
     elif ptype == "premium" and premium_data:
         period = premium_data.get('period', 'Premium')
         priceprem = premium_data.get('priceprem', amount)
@@ -1552,6 +1563,129 @@ async def sbp_payment(callback: CallbackQuery):
         await callback.message.answer(f"❌ Ошибка: {result.get('error')}")
 
     await callback.answer()
+# ===== ХРАНИЛИЩЕ ДЛЯ ВЕБХУКА =====
+processed_webhooks = set()
+
+# ===== ВЕБХУК ДЛЯ PLATEGA =====
+async def platega_webhook(request):
+    try:
+        data = await request.json()
+        print(f"📩 Platega webhook: {json.dumps(data, indent=2)}")
+        
+        transaction_id = data.get('transactionId')
+        status = data.get('status')
+        payload = data.get('payload', '')
+        
+        # Защита от дубликатов
+        if transaction_id in processed_webhooks:
+            print(f"⚠️ Дубликат {transaction_id}, игнорируем")
+            return web.Response(text="OK", status=200)
+        processed_webhooks.add(transaction_id)
+        
+        if status == 'SUCCESS' and payload:
+            parts = payload.split('_')
+            print(f"📦 Payload части: {parts}")
+            
+            # Формат: тип_данные_сумма_получатель
+            if len(parts) >= 3:
+                ptype = parts[0]        # stars, premium, ton, gift
+                quantity = parts[1]      # количество или gift_id
+                amount = float(parts[2])  # сумма
+                recipient = parts[3] if len(parts) > 3 else None
+                
+                # Получаем ID пользователя из payload или из данных
+                user_id = None
+                if recipient:
+                    # Пытаемся найти пользователя по username
+                    try:
+                        user = await bot.get_chat(recipient)
+                        user_id = user.id
+                    except:
+                        # Если не нашли — возможно ID в payload
+                        pass
+                
+                # ===== ОБРАБОТКА ПОДАРКА =====
+                if ptype == "gift":
+                    gift_id = int(quantity)
+                    
+                    # Отправляем подарок через Telethon
+                    from username_checker import send_telegram_gift
+                    
+                    gift_result = await send_telegram_gift(
+                        receiver_username=recipient.replace('@', ''),
+                        gift_id=gift_id,
+                        text="Поздравляю с подарком! 🎁"
+                    )
+                    
+                    if gift_result["success"]:
+                        # Уведомление покупателю (если знаем user_id)
+                        if user_id:
+                            await bot.send_message(
+                                user_id,
+                                f"✅ Подарок отправлен {recipient}!\nСпасибо за покупку!\n/menu — вернуться в меню",
+                                parse_mode="HTML"
+                            )
+                        
+                        # Уведомление админу
+                        admin_text = (
+                            f"🎁 <b>ПОДАРОК ОТПРАВЛЕН</b>\n\n"
+                            f"👤 <b>Получатель:</b> {recipient}\n"
+                            f"🆔 <b>ID подарка:</b> {gift_id}\n"
+                            f"💵 <b>Сумма:</b> {amount}₽\n"
+                            f"🧾 <b>Транзакция:</b> <code>{transaction_id}</code>\n"
+                            f"⏱ <b>Время:</b> {time.strftime('%Y-%m-%d %H:%M:%S')}"
+                        )
+                        await bot.send_message(ADMIN_ID, admin_text, parse_mode="HTML")
+                        print(f"✅ Подарок отправлен {recipient}")
+                    else:
+                        # Ошибка отправки подарка
+                        error_text = f"❌ Ошибка отправки подарка: {gift_result.get('error')}"
+                        if user_id:
+                            await bot.send_message(user_id, error_text)
+                        print(f"❌ Ошибка: {gift_result.get('error')}")
+                
+                # ===== ОБРАБОТКА ЗВЁЗД, PREMIUM, TON =====
+                else:
+                    # Название товара на русском
+                    product_names = {
+                        "stars": "Звёзды",
+                        "premium": "Premium",
+                        "ton": "TON"
+                    }
+                    product_name = product_names.get(ptype, ptype.upper())
+                    
+                    # Уведомление пользователю
+                    if user_id:
+                        user_text = (
+                            f"✅ <b>Оплата подтверждена!</b>\n\n"
+                            f"📦 <b>Товар:</b> {product_name}\n"
+                            f"🔢 <b>Количество:</b> {quantity}\n"
+                            f"💵 <b>Сумма:</b> {amount}₽\n\n"
+                            f"Спасибо за покупку!\n/menu — вернуться в меню"
+                        )
+                        await bot.send_message(user_id, user_text, parse_mode="HTML")
+                    
+                    # Уведомление админу
+                    admin_text = (
+                        f"💰 <b>НОВЫЙ ПЛАТЁЖ</b>\n\n"
+                        f"👤 <b>Пользователь:</b> {recipient or 'неизвестно'}\n"
+                        f"🆔 <b>ID:</b> <code>{user_id or 'неизвестно'}</code>\n"
+                        f"📦 <b>Товар:</b> {product_name}\n"
+                        f"🔢 <b>Количество:</b> {quantity}\n"
+                        f"💵 <b>Сумма:</b> {amount}₽\n"
+                        f"🧾 <b>Транзакция:</b> <code>{transaction_id}</code>\n"
+                        f"⏱ <b>Время:</b> {time.strftime('%Y-%m-%d %H:%M:%S')}"
+                    )
+                    await bot.send_message(ADMIN_ID, admin_text, parse_mode="HTML")
+                    print(f"✅ Платёж подтверждён: {ptype} {quantity} за {amount}₽")
+        
+        return web.Response(text="OK", status=200)
+        
+    except Exception as e:
+        print(f"❌ Ошибка webhook: {e}")
+        import traceback
+        traceback.print_exc()
+        return web.Response(text="Error", status=500)
 
 # ===== АДМИН-ПАНЕЛЬ =====
 @router.message(Command("admin"))
