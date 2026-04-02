@@ -247,6 +247,185 @@ async def info_callback(callback: CallbackQuery, state: FSMContext):
     await save_and_delete_previous(callback.from_user.id, sent_message.message_id)
     await callback.answer()
 
+@router.message(Command("nft"))
+async def nft_cmd(message: Message, state: FSMContext):
+    await state.clear()
+
+    text = (
+        "<tg-emoji emoji-id=\"5380006756594243067\">💎</tg-emoji><b>Подарки</b>\n\n"
+        "Выберите подарок из списка ниже:")
+    keyboard = InlineKeyboardButton(inline_keyboard=[
+        [InlineKeyboardButton(text="- Новогодняя елка | 60₽", icon_custom_emoji_id=5346117566253276549, callback_data="christmastree")],
+        [InlineKeyboardButton(text="- Новогодний мишка | 60₽", icon_custom_emoji_id=5379850046122527013, callback_data="newyearbear")],
+        [InlineKeyboardButton(text="- Мишка 14 февраля | 60₽", icon_custom_emoji_id=5224509179334529299, callback_data="14bear")],
+        [InlineKeyboardButton(text="- Сердце 14 февраля | 60₽", icon_custom_emoji_id=5224648868850863664, callback_data="14heart")],
+        [InlineKeyboardbutton(text="Назад", callback_data="menu")]
+
+     try:
+        sent_message = await message.answer_photo(caption=text, reply_markup=keyboard)
+    except:
+        sent_message = await message.answer(text, reply_markup=keyboard)
+    
+    await save_and_delete_previous(message.from_user.id, sent_message.message_id)
+
+
+# ===== ОБРАБОТЧИК ВЫБОРА ПОДАРКА =====
+@router.callback_query(F.data.startswith("gift_"))
+async def gift_selection(callback: CallbackQuery, state: FSMContext):
+    user_id = callback.from_user.id
+    
+    # Карта подарков
+    gifts = {
+        "gift_christmastree": {"name": "Новогодняя елка", "price": 60, "gift_id": 5956217000635139069},
+        "gift_newyearbear": {"name": "Новогодний мишка", "price": 60, "gift_id": 5922558454332916696},
+        "gift_14bear": {"name": "Мишка 14 февраля", "price": 60, "gift_id": 5800655655995968830},
+        "gift_14heart": {"name": "Сердце 14 февраля", "price": 60, "gift_id": 5801108895304779062},
+    }
+    
+    gift_key = callback.data
+    gift_info = gifts.get(gift_key)
+    
+    if not gift_info:
+        await callback.answer("❌ Подарок не найден", show_alert=True)
+        return
+    
+    # Сохраняем данные о подарке
+    save_user_data(user_id, "gift", {
+        'name': gift_info['name'],
+        'price': gift_info['price'],
+        'gift_id': gift_info['gift_id']
+    })
+    
+    text = (
+        f"<tg-emoji emoji-id=\"5380006756594243067\">💎</tg-emoji><b>Подарок: {gift_info['name']}</b>\n\n"
+        f"💰 Стоимость: {gift_info['price']}₽\n\n"
+        f"Для кого вы приобретаете подарок?"
+    )
+    
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="💫 Себе", callback_data="gift_self")],
+        [InlineKeyboardButton(text="🎁 Подарить другу", callback_data="gift_friend")],
+        [InlineKeyboardButton(text="Назад", callback_data="nft")]
+    ])
+    
+    await callback.message.edit_text(text, reply_markup=keyboard)
+    await callback.answer()
+
+
+# ===== ПОДАРОК СЕБЕ =====
+@router.callback_query(F.data == "gift_self")
+async def gift_self(callback: CallbackQuery):
+    user_id = callback.from_user.id
+    gift_data = get_user_data(user_id, "gift")
+    
+    if not gift_data:
+        await callback.answer("❌ Сначала выберите подарок", show_alert=True)
+        return
+    
+    username = callback.from_user.username
+    if not username:
+        username = f"id{user_id}"
+    else:
+        username = f"@{username}"
+    
+    text = (
+        f"<tg-emoji emoji-id=\"5380006756594243067\">💎</tg-emoji><b>Подарок: {gift_data['name']}</b>\n\n"
+        f"💰 Стоимость: {gift_data['price']}₽\n"
+        f"👤 Получатель: {username}\n\n"
+        f"Выберите способ оплаты:"
+    )
+    
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🏦 СБП", callback_data=f"sbp_gift_self_{gift_data['price']}")],
+        [InlineKeyboardButton(text="❌ Отмена", callback_data="nft")]
+    ])
+    
+    await callback.message.edit_text(text, reply_markup=keyboard)
+    await callback.answer()
+
+
+# ===== ПОДАРОК ДРУГУ =====
+@router.callback_query(F.data == "gift_friend")
+async def gift_friend(callback: CallbackQuery, state: FSMContext):
+    user_id = callback.from_user.id
+    gift_data = get_user_data(user_id, "gift")
+    
+    if not gift_data:
+        await callback.answer("❌ Сначала выберите подарок", show_alert=True)
+        return
+    
+    text = (
+        f"<tg-emoji emoji-id=\"5380006756594243067\">💎</tg-emoji><b>Подарок: {gift_data['name']}</b>\n\n"
+        f"💰 Стоимость: {gift_data['price']}₽\n\n"
+        f"👤 Введите @username получателя:"
+    )
+    
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="Назад", callback_data="nft")]
+    ])
+    
+    await callback.message.edit_text(text, reply_markup=keyboard)
+    await state.set_state("waiting_for_gift_username")
+    await callback.answer()
+
+
+# ===== ОБРАБОТКА USERNAME ДЛЯ ПОДАРКА =====
+@router.message(Form.waiting_for_gift_username)
+async def process_gift_username(message: Message, state: FSMContext):
+    await delete_user_message(message.from_user.id, message.message_id)
+    
+    username = message.text.strip()
+    if not username:
+        error_msg = await message.answer("❌ Пожалуйста, введите username")
+        await save_and_delete_previous(message.from_user.id, error_msg.message_id)
+        await asyncio.sleep(2)
+        await delete_user_message(message.from_user.id, error_msg.message_id)
+        return
+    
+    # Проверяем существование username
+    from username_checker import check_username
+    
+    check_msg = await message.answer("🔍 Проверяю пользователя...")
+    result = await check_username(username)
+    await delete_user_message(message.from_user.id, check_msg.message_id)
+    
+    if not result['exists']:
+        error_text = f"❌ Пользователь {username} не найден"
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🔄 Попробовать снова", callback_data="gift_friend")]
+        ])
+        sent_message = await message.answer(error_text, reply_markup=keyboard)
+        await save_and_delete_previous(message.from_user.id, sent_message.message_id)
+        await state.clear()
+        return
+    
+    if not username.startswith('@'):
+        username = f"@{username}"
+    
+    user_id = message.from_user.id
+    gift_data = get_user_data(user_id, "gift")
+    
+    if not gift_data:
+        await message.answer("❌ Ошибка данных")
+        await state.clear()
+        return
+    
+    text = (
+        f"<tg-emoji emoji-id=\"5380006756594243067\">💎</tg-emoji><b>Подарок: {gift_data['name']}</b>\n\n"
+        f"💰 Стоимость: {gift_data['price']}₽\n"
+        f"👤 Получатель: {username}\n\n"
+        f"Выберите способ оплаты:"
+    )
+    
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🏦 СБП", callback_data=f"sbp_gift_friend_{gift_data['price']}_{username}")],
+        [InlineKeyboardButton(text="❌ Отмена", callback_data="nft")]
+    ])
+    
+    sent_message = await message.answer(text, reply_markup=keyboard)
+    await save_and_delete_previous(message.from_user.id, sent_message.message_id)
+    await state.clear()
+
 
 # ===== КОМАНДА /STARS =====
 @router.message(Command("stars"))
