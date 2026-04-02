@@ -122,6 +122,7 @@ class Form(StatesGroup):
     waiting_for_ton_friend_username = State()
     waiting_for_premium_friend = State()
     waiting_broadcast_text = State()
+    waiting_for_gift_username = State()
 
 
 # ===== ХРАНИЛИЩЕ ДАННЫХ =====
