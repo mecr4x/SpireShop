@@ -249,7 +249,7 @@ async def info_callback(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
 
 @router.message(Command("nft"))
-async def nft_cmd(message: Message, state: FSMContext):
+async def cmd_nft(message: Message, state: FSMContext):
     await state.clear()
 
     text = (
@@ -299,7 +299,7 @@ async def gift_selection(callback: CallbackQuery, state: FSMContext):
     
     text = (
         f"<tg-emoji emoji-id=\"5380006756594243067\">💎</tg-emoji><b>Подарок: {gift_info['name']}</b>\n\n"
-        f"💰 Стоимость: {gift_info['price']}₽\n\n"
+        f"<b>Стоимость:</b> {gift_info['price']}₽\n\n"
         f"Для кого вы приобретаете подарок?"
     )
     
@@ -331,8 +331,8 @@ async def gift_self(callback: CallbackQuery):
     
     text = (
         f"<tg-emoji emoji-id=\"5380006756594243067\">💎</tg-emoji><b>Подарок: {gift_data['name']}</b>\n\n"
-        f"💰 Стоимость: {gift_data['price']}₽\n"
-        f"👤 Получатель: {username}\n\n"
+        f"<b>Стоимость:</b> {gift_data['price']}₽\n"
+        f"<b>Получатель:</b> {username}\n\n"
         f"Выберите способ оплаты:"
     )
     
