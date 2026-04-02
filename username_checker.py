@@ -200,8 +200,6 @@ async def create_platega_invoice(
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-from telethon.tl.functions.payments import SendGiftRequest
-
 async def send_gift_via_ptb(receiver_username: str, gift_id: str, text: str = ""):
     """Отправляет подарок через python-telegram-bot"""
     try:
