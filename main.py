@@ -197,7 +197,7 @@ async def menu_cmd(message: Message):
         [InlineKeyboardButton(text="Пополнить TON", callback_data="ton", icon_custom_emoji_id=5438332129006081114)],
         [InlineKeyboardButton(text="Купить Premium", callback_data="premium",
                               icon_custom_emoji_id=5402352097045795954)],
-        [InlineKeboardButton(text="Купить подарки", callback_data="nft", icon_custom_emoji_id=5380006756594243067)],
+        [InlineKeyboardButton(text="Купить подарки", callback_data="nft", icon_custom_emoji_id=5380006756594243067)],
                              
         [
             InlineKeyboardButton(text="Поддержка", url=f"https://t.me/{SUPPORT_USERNAME[1:]}",
