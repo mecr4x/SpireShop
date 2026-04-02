@@ -304,8 +304,8 @@ async def gift_selection(callback: CallbackQuery, state: FSMContext):
     )
     
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="💫 Себе", callback_data="gift_self")],
-        [InlineKeyboardButton(text="🎁 Подарить другу", callback_data="gift_friend")],
+        [InlineKeyboardButton(text="Себе", callback_data="gift_self", icon_custom_emoji_id=5406604187683270743)],
+        [InlineKeyboardButton(text="Подарить другу", callback_data="gift_friend",icon_custom_emoji_id=5203996991054432397)],
         [InlineKeyboardButton(text="Назад", callback_data="nft")]
     ])
     
@@ -337,7 +337,7 @@ async def gift_self(callback: CallbackQuery):
     )
     
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🏦 СБП", callback_data=f"sbp_gift_self_{gift_data['price']}")],
+        [InlineKeyboardButton(text="СБП", callback_data=f"sbp_gift_self_{gift_data['price']}", icon_custom_emoji_id=5305413839066525446)],
         [InlineKeyboardButton(text="❌ Отмена", callback_data="nft")]
     ])
     
@@ -356,9 +356,10 @@ async def gift_friend(callback: CallbackQuery, state: FSMContext):
         return
     
     text = (
-        f"<tg-emoji emoji-id=\"5380006756594243067\">💎</tg-emoji><b>Подарок: {gift_data['name']}</b>\n\n"
-        f"💰 Стоимость: {gift_data['price']}₽\n\n"
-        f"👤 Введите @username получателя:"
+        f"<tg-emoji emoji-id=\"5380006756594243067\">💎</tg-emoji><b>Подарок</b>\n\n"
+        f"<b>Подарок:</b>{gift_data['name']}\n"
+        f"<b>Стоимость:</b> {gift_data['price']}₽\n\n"
+        f"Введите @username получателя:"
     )
     
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
@@ -393,7 +394,7 @@ async def process_gift_username(message: Message, state: FSMContext):
     if not result['exists']:
         error_text = f"❌ Пользователь {username} не найден"
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="🔄 Попробовать снова", callback_data="gift_friend")]
+            [InlineKeyboardButton(text=" Попробовать снова", callback_data="gift_friend")]
         ])
         sent_message = await message.answer(error_text, reply_markup=keyboard)
         await save_and_delete_previous(message.from_user.id, sent_message.message_id)
@@ -412,14 +413,15 @@ async def process_gift_username(message: Message, state: FSMContext):
         return
     
     text = (
-        f"<tg-emoji emoji-id=\"5380006756594243067\">💎</tg-emoji><b>Подарок: {gift_data['name']}</b>\n\n"
-        f"💰 Стоимость: {gift_data['price']}₽\n"
-        f"👤 Получатель: {username}\n\n"
+        f"<tg-emoji emoji-id=\"5380006756594243067\">💎</tg-emoji><b>Подарокl</b>\n\n"
+        f"<b>Подарок:</b>{gift_data['name']}\n"
+        f"<b>Стоимость:</b> {gift_data['price']}₽\n"
+        f"<b>Получатель:</b> {username}\n\n"
         f"Выберите способ оплаты:"
     )
     
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🏦 СБП", callback_data=f"sbp_gift_friend_{gift_data['price']}_{username}")],
+        [InlineKeyboardButton(text="СБП", callback_data=f"sbp_gift_friend_{gift_data['price']}_{username}",icon_custom_emoji_id=5305413839066525446)],
         [InlineKeyboardButton(text="❌ Отмена", callback_data="nft")]
     ])
     
