@@ -253,19 +253,18 @@ async def nft_cmd(message: Message, state: FSMContext):
 
     text = (
         "<tg-emoji emoji-id=\"5380006756594243067\">💎</tg-emoji><b>Подарки</b>\n\n"
-        "Выберите подарок из списка ниже:")
-    keyboard = InlineKeyboardButton(inline_keyboard=[
-        [InlineKeyboardButton(text="- Новогодняя елка | 60₽", icon_custom_emoji_id=5346117566253276549, callback_data="christmastree")],
-        [InlineKeyboardButton(text="- Новогодний мишка | 60₽", icon_custom_emoji_id=5379850046122527013, callback_data="newyearbear")],
-        [InlineKeyboardButton(text="- Мишка 14 февраля | 60₽", icon_custom_emoji_id=5224509179334529299, callback_data="14bear")],
-        [InlineKeyboardButton(text="- Сердце 14 февраля | 60₽", icon_custom_emoji_id=5224648868850863664, callback_data="14heart")],
-        [InlineKeyboardbutton(text="Назад", callback_data="menu")]
+        "Выберите подарок из списка ниже:"
+    )
+    
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="Новогодняя елка | 60₽", icon_custom_emoji_id=5346117566253276549, callback_data="gift_christmastree")],
+        [InlineKeyboardButton(text="Новогодний мишка | 60₽", icon_custom_emoji_id=5379850046122527013, callback_data="gift_newyearbear")],
+        [InlineKeyboardButton(text="Мишка 14 февраля | 60₽", icon_custom_emoji_id=5224509179334529299, callback_data="gift_14bear")],
+        [InlineKeyboardButton(text="Сердце 14 февраля | 60₽", icon_custom_emoji_id=5224648868850863664, callback_data="gift_14heart")],
+        [InlineKeyboardButton(text="Назад", callback_data="menu")]
     ])
 
-     try:
-        sent_message = await message.answer_photo(caption=text, reply_markup=keyboard)
-    except:
-        sent_message = await message.answer(text, reply_markup=keyboard)
+    sent_message = await message.answer(text, reply_markup=keyboard)
     
     await save_and_delete_previous(message.from_user.id, sent_message.message_id)
 
