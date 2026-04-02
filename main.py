@@ -15,55 +15,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.client.default import DefaultBotProperties
 from aiohttp import web
 import json
-
-# ===== ХРАНИЛИЩЕ ДЛЯ ВЕБХУКА =====
-processed_webhooks = set()
-
-# ===== ВЕБХУК ДЛЯ PLATEGA =====
-async def platega_webhook(request):
-    try:
-        data = await request.json()
-        print(f"📩 Platega webhook: {json.dumps(data, indent=2)}")
-        
-        transaction_id = data.get('transactionId')
-        status = data.get('status')
-        payload = data.get('payload', '')
-        
-        if transaction_id in processed_webhooks:
-            return web.Response(text="OK", status=200)
-        processed_webhooks.add(transaction_id)
-        
-        if status == 'SUCCESS' and payload:
-            parts = payload.split('_')
-            if len(parts) >= 2:
-                user_id = int(parts[1])
-                ptype = parts[0]
-                amount = data.get('paymentDetails', {}).get('amount', 0)
-                
-                # Уведомление пользователю
-                await bot.send_message(
-                    user_id,
-                    f"✅ Оплата подтверждена!\n"
-                    f"Спасибо за покупку ждем вас снова в SpireShop!"
-                )
-                
-                # Уведомление админу
-                await bot.send_message(
-                    ADMIN_ID,
-                    f"Новый платёж!\nПользователь: {user_id}\nТовар: {ptype}\nСумма: {amount}₽"
-                )
-        
-        return web.Response(text="OK")
-    except Exception as e:
-        print(f"❌ Ошибка webhook: {e}")
-        return web.Response(text="Error", status=500)
-
-# ===== РЕГИСТРАЦИЯ ОБРАБОТЧИКА (Bothost сам вызовет) =====
-def create_app():
-    """Создаёт приложение для веб-сервера Bothost"""
-    app = web.Application()
-    app.router.add_post('/webhook/platega', platega_webhook)
-    return app
+    
 # Создаём роутер
 router = Router()
 
@@ -230,10 +182,6 @@ async def check_sub(callback: CallbackQuery):
     # Удаляем сообщение с кнопкой
     await delete_user_message(callback.from_user.id, callback.message.message_id)
 
-    # Отправляем подтверждение
-    confirm_msg = await callback.message.answer("✅ Подписка подтверждена!")
-    await save_and_delete_previous(callback.from_user.id, confirm_msg.message_id)
-
     # Показываем меню
     await asyncio.sleep(1)
     await menu_cmd(callback.message)
@@ -248,6 +196,8 @@ async def menu_cmd(message: Message):
         [InlineKeyboardButton(text="Пополнить TON", callback_data="ton", icon_custom_emoji_id=5438332129006081114)],
         [InlineKeyboardButton(text="Купить Premium", callback_data="premium",
                               icon_custom_emoji_id=5402352097045795954)],
+        [InlineKeboardButton(text="Купить подарки", callback_data="nft", icon_custom_emoji_id=
+                             
         [
             InlineKeyboardButton(text="Поддержка", url=f"https://t.me/{SUPPORT_USERNAME[1:]}",
                                  icon_custom_emoji_id=6021798595739523148),
@@ -880,9 +830,9 @@ async def premium_period_callback(callback: CallbackQuery, state: FSMContext):
     }
 
     prices = {
-        "premium_12": 30000,
-        "premium_6": 1700,
-        "premium_3": 1300
+        "premium_12": 2999,
+        "premium_6": 1699,
+        "premium_3": 1299
     }
 
     period = periods.get(callback.data, "3 месяца")
@@ -1353,22 +1303,22 @@ async def sbp_payment(callback: CallbackQuery):
     description = f"Оплата {amount}₽"
     base_price = amount
     final_amount = amount
-    quantity = 1
+    quantity = "1"
 
     # Определяем описание и разделяем цены для каждого типа товара
-     if ptype == "stars" and stars_data:
-        quantity = stars_data.get('star_value', '?')
-        description = f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> {quantity} звёзд"
-        base_price = round(star_value * 1.65, 1)  # ТВОЯ ЦЕНА: 1.7 за звезду
+    if ptype == "stars" and stars_data:
+        star_value = stars_data.get('star_value', 1)
+        quantity = str(star_value)
+        description = f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> {star_value} звёзд"
+        base_price = round(star_value * 1.65, 1)
         final_amount = round(base_price / 0.92, 1)
 
-  elif ptype == "premium" and premium_data:
-        quantity = premium_data.get('period', 'Premium')
+    elif ptype == "premium" and premium_data:
+        period = premium_data.get('period', 'Premium')
         priceprem = premium_data.get('priceprem', amount)
-        print(f"👑 Premium данные: period={quantity}, priceprem={priceprem}")
-
-        description = f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> Telegram Premium на {quantity}"
-        # ТВОИ ЦЕНЫ
+        print(f"👑 Premium данные: period={period}, priceprem={priceprem}")
+        
+        description = f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> Telegram Premium на {period}"
         base_prices = {
             "12 месяцев": 2999,
             "6 месяцев": 1699,
@@ -1376,20 +1326,16 @@ async def sbp_payment(callback: CallbackQuery):
         }
         base_price = base_prices.get(period, priceprem)
         final_amount = round(base_price / 0.92, 1)
+        quantity = "12" if period == "12 месяцев" else "6" if period == "6 месяцев" else "3"
 
-   elif ptype == "ton" and ton_data:
-        quantity = ton_data.get('ton_value', '?')
-        description = f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> {quantity} TON"
-        base_price = round(ton_value * (TON_RUB + 30), 1)  # ТВОЙ КУРС: TON_RUB + 30
+    elif ptype == "ton" and ton_data:
+        ton_value = ton_data.get('ton_value', 1)
+        quantity = str(ton_value)
+        description = f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> {ton_value} TON"
+        base_price = round(ton_value * (TON_RUB + 30), 1)
         final_amount = round(base_price / 0.92, 1)
 
-    order_id = f"{ptype}_{user_id}_{int(time.time())}"
-
-    wait_msg = await callback.message.answer("Создаю ссылку для оплаты...")
-
-    from username_checker import create_platega_invoice
-
-     # Формируем payload для вебхука (тип_количество_сумма_получатель)
+    # Формируем payload для вебхука (тип_количество_сумма_получатель)
     payload = f"{ptype}_{quantity}_{round(final_amount, 1)}_{username}"
 
     wait_msg = await callback.message.answer("Создаю ссылку для оплаты...")
@@ -1402,9 +1348,8 @@ async def sbp_payment(callback: CallbackQuery):
     result = await create_platega_invoice(
         amount_rub=final_amount,
         description=platega_description,
-        order_id=payload  # 👈 payload передаётся в order_id
+        order_id=payload
     )
-
 
     await delete_user_message(user_id, wait_msg.message_id)
 
