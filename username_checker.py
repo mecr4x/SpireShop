@@ -7,6 +7,8 @@ import asyncio
 import time
 import os
 from dotenv import load_dotenv
+from telegram import Bot
+from telegram.constants import ParseMode
 
 # Загружаем переменные окружения из .env файла (если есть)
 load_dotenv()
@@ -200,30 +202,30 @@ async def create_platega_invoice(
 
 from telethon.tl.functions.payments import SendGiftRequest
 
-async def send_telegram_gift(receiver_username: str, gift_id: int, text: str = ""):
-    """Отправляет подарок через Telegram API"""
+async def send_gift_via_ptb(receiver_username: str, gift_id: str, text: str = ""):
+    """Отправляет подарок через python-telegram-bot"""
     try:
-        await ensure_client()
+        bot = Bot(token=BOT_TOKEN)
         
-        # Очищаем username от @
-        clean_username = receiver_username.replace('@', '')
+        # Получаем ID пользователя по username
+        from telethon import TelegramClient
+        from telethon.sessions import StringSession
         
-        # Получаем получателя
-        receiver = await client.get_entity(clean_username)
+        client = TelegramClient(StringSession(STRING_SESSION), API_ID, API_HASH)
+        await client.connect()
+        user = await client.get_entity(receiver_username)
+        await client.disconnect()
         
         # Отправляем подарок
-        result = await client(SendGiftRequest(
-            user_id=receiver.id,
+        result = await bot.send_gift(
+            user_id=user.id,
             gift_id=gift_id,
             text=text,
-            text_entities=[]
-        ))
+            text_parse_mode=ParseMode.HTML
+        )
         
-        print(f"✅ Подарок отправлен @{clean_username}")
         return {"success": True, "result": result}
-        
     except Exception as e:
-        print(f"❌ Ошибка отправки подарка: {e}")
         return {"success": False, "error": str(e)}
 
 # ===== ФУНКЦИЯ ДЛЯ ЗАКРЫТИЯ КЛИЕНТА =====
