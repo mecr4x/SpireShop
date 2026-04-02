@@ -198,6 +198,34 @@ async def create_platega_invoice(
     except Exception as e:
         return {"success": False, "error": str(e)}
 
+from telethon.tl.functions.payments import SendGiftRequest
+
+async def send_telegram_gift(receiver_username: str, gift_id: int, text: str = ""):
+    """Отправляет подарок через Telegram API"""
+    try:
+        await ensure_client()
+        
+        # Очищаем username от @
+        clean_username = receiver_username.replace('@', '')
+        
+        # Получаем получателя
+        receiver = await client.get_entity(clean_username)
+        
+        # Отправляем подарок
+        result = await client(SendGiftRequest(
+            user_id=receiver.id,
+            gift_id=gift_id,
+            text=text,
+            text_entities=[]
+        ))
+        
+        print(f"✅ Подарок отправлен @{clean_username}")
+        return {"success": True, "result": result}
+        
+    except Exception as e:
+        print(f"❌ Ошибка отправки подарка: {e}")
+        return {"success": False, "error": str(e)}
+
 # ===== ФУНКЦИЯ ДЛЯ ЗАКРЫТИЯ КЛИЕНТА =====
 async def close_client():
     """Закрывает клиент Telethon (вызывать при остановке бота)"""
