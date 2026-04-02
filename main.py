@@ -260,6 +260,7 @@ async def nft_cmd(message: Message, state: FSMContext):
         [InlineKeyboardButton(text="- Мишка 14 февраля | 60₽", icon_custom_emoji_id=5224509179334529299, callback_data="14bear")],
         [InlineKeyboardButton(text="- Сердце 14 февраля | 60₽", icon_custom_emoji_id=5224648868850863664, callback_data="14heart")],
         [InlineKeyboardbutton(text="Назад", callback_data="menu")]
+    ]
 
      try:
         sent_message = await message.answer_photo(caption=text, reply_markup=keyboard)
