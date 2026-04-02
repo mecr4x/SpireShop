@@ -1484,7 +1484,7 @@ async def sbp_payment(callback: CallbackQuery):
     final_amount = amount
     quantity = "1"
 
-    # Определяем описание и разделяем цены для каждого типа товара
+        # Определяем описание и разделяем цены для каждого типа товара
     if ptype == "stars" and stars_data:
         star_value = stars_data.get('star_value', 1)
         quantity = str(star_value)
@@ -1492,22 +1492,10 @@ async def sbp_payment(callback: CallbackQuery):
         base_price = round(star_value * 1.65, 1)
         final_amount = round(base_price / 0.92, 1)
 
-    elif ptype == "gift" and gift_data:
-        gift_id = gift_data.get('gift_id')
-        gift_name = gift_data.get('name')
-        description = f"<tg-emoji emoji-id=\"5380006756594243067\">💎</tg-emoji><b>Подарок: {gift_name}</b>"
-        base_price = gift_data.get('price')
-        final_amount = round(base_price / 0.92, 1)
-        quantity = "1"
-    
-    # Payload: gift_IDподарка_сумма_получатель
-    payload = f"gift_{gift_id}_{round(final_amount, 1)}_{recipient}"
-
     elif ptype == "premium" and premium_data:
         period = premium_data.get('period', 'Premium')
         priceprem = premium_data.get('priceprem', amount)
-        print(f"👑 Premium данные: period={period}, priceprem={priceprem}")
-        
+        quantity = "12" if period == "12 месяцев" else "6" if period == "6 месяцев" else "3"
         description = f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> Telegram Premium на {period}"
         base_prices = {
             "12 месяцев": 2999,
@@ -1516,7 +1504,6 @@ async def sbp_payment(callback: CallbackQuery):
         }
         base_price = base_prices.get(period, priceprem)
         final_amount = round(base_price / 0.92, 1)
-        quantity = "12" if period == "12 месяцев" else "6" if period == "6 месяцев" else "3"
 
     elif ptype == "ton" and ton_data:
         ton_value = ton_data.get('ton_value', 1)
@@ -1524,6 +1511,18 @@ async def sbp_payment(callback: CallbackQuery):
         description = f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> {ton_value} TON"
         base_price = round(ton_value * (TON_RUB + 30), 1)
         final_amount = round(base_price / 0.92, 1)
+
+    elif ptype == "gift":
+        gift_data = get_user_data(user_id, "gift")
+        if gift_data:
+            quantity = "1"
+            description = f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Подарок: {gift_data['name']}</b>"
+            base_price = gift_data['price']
+            final_amount = round(base_price / 0.92, 1)
+            gift_id = gift_data['gift_id']
+        else:
+            await callback.answer("❌ Ошибка: подарок не выбран", show_alert=True)
+            return
 
     # Формируем payload для вебхука (тип_количество_сумма_получатель)
     payload = f"{ptype}_{quantity}_{round(final_amount, 1)}_{username}"
