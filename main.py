@@ -423,7 +423,7 @@ async def process_gift_username(message: Message, state: FSMContext):
     
     sent_message = await message.answer(text, reply_markup=keyboard)
     await save_and_delete_previous(message.from_user.id, sent_message.message_id)
-    await state.clear()
+        await state.clear()
 
 # ===== КОМАНДА /STARS =====
 @router.message(Command("stars"))
