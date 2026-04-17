@@ -8,14 +8,11 @@ if sys.platform == 'win32':
 import aiohttp
 from aiogram import Bot, Dispatcher, Router, F  # 👈 Router отсюда!
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, FSInputFile
-from aiogram.filters import Command, StateFilter
+from aiogram.filters import Command, StateFilter, state
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.client.default import DefaultBotProperties
-from aiohttp import web
-import json
-    
 # Создаём роутер
 router = Router()
 
@@ -23,17 +20,20 @@ router = Router()
 user_ids = set()  # множество для хранения ID всех пользователей
 admin_commands = {}  # для хранения временных данных
 
-# ===== СОХРАНЕНИЕ ВСЕХ ПОЛЬЗОВАТЕЛЕЙ =====
-@router.message(F.text)
-async def save_all_users(message: Message):
+# Сохраняем пользователя при любом сообщении
+@router.message()
+async def save_user_on_message(message: Message):
     user_ids.add(message.from_user.id)
+    # Пропускаем сообщение дальше (не блокируем другие хендлеры)
+    await asyncio.sleep(0)  # просто даем шанс другим хендлерам
 
-@router.callback_query(F.text)
-async def save_all_users_callback(callback: CallbackQuery):
+# Сохраняем пользователя при любом callback
+@router.callback_query()
+async def save_user_on_callback(callback: CallbackQuery):
     user_ids.add(callback.from_user.id)
-
+    await asyncio.sleep(0)
 # ===== КОНФИГУРАЦИЯ =====
-BOT_TOKEN = "8236812443:AAHgQEWDwQMDAHhv8sIRxhKqmsToX9Rn85c"
+BOT_TOKEN = "8347029597:AAHPePceuPonObv_QO4q5EjRo-MuGBGUR5w"
 ADMIN_ID = 887261650
 ADMIN_CHANNEL = '@spireshop01'  # канал для подписки
 SUPPORT_USERNAME = '@adamyan_ss'
@@ -103,15 +103,6 @@ async def require_subscription_callback(callback: CallbackQuery) -> bool:
         return False
     return True
 
-# ===== ЦЕНЫ (можно менять через админку) =====
-PRICES = {
-    "stars": 1.65,           # цена за звезду
-    "premium_12": 2999,
-    "premium_6": 1699,
-    "premium_3": 1299,
-    "ton_markup": 30,       # наценка на TON
-}
-
 
 # ===== СОСТОЯНИЯ =====
 class Form(StatesGroup):
@@ -121,8 +112,15 @@ class Form(StatesGroup):
     waiting_for_ton_amount = State()  # 👈 ЭТО ДОЛЖНО БЫТЬ
     waiting_for_ton_friend_username = State()
     waiting_for_premium_friend = State()
-    waiting_broadcast_text = State()
-    waiting_for_gift_username = State()
+    waiting_for_steam_login = State()
+    waiting_for_steam_amount = State()
+    waiting_for_premium_steam = State()
+class AdminStates(StatesGroup):
+    waiting_for_photo = State()
+    waiting_for_text = State()
+    waiting_for_button = State()
+    waiting_for_callback = State()
+
 
 
 # ===== ХРАНИЛИЩЕ ДАННЫХ =====
@@ -156,6 +154,7 @@ async def get_ton_price():
 # ===== КОМАНДА /START =====
 @router.message(Command("start"))
 async def start_cmd(message: Message):
+    user_ids.add(message.from_user.id)
     text = (
         "<b>Добро пожаловать!</b>\n\n"
         "<b>Spire</b> — магазин для покупки Telegram Stars, TON и Premium "
@@ -180,8 +179,13 @@ async def start_cmd(message: Message):
 # ===== ПРОВЕРКА ПОДПИСКИ =====
 @router.callback_query(F.data == "check_sub")
 async def check_sub(callback: CallbackQuery):
+    user_ids.add(callback.from_user.id)
     # Удаляем сообщение с кнопкой
     await delete_user_message(callback.from_user.id, callback.message.message_id)
+
+    # Отправляем подтверждение
+    confirm_msg = await callback.message.answer("✅ Подписка подтверждена!")
+    await save_and_delete_previous(callback.from_user.id, confirm_msg.message_id)
 
     # Показываем меню
     await asyncio.sleep(1)
@@ -197,8 +201,7 @@ async def menu_cmd(message: Message):
         [InlineKeyboardButton(text="Пополнить TON", callback_data="ton", icon_custom_emoji_id=5438332129006081114)],
         [InlineKeyboardButton(text="Купить Premium", callback_data="premium",
                               icon_custom_emoji_id=5402352097045795954)],
-        [InlineKeyboardButton(text="Купить подарки", callback_data="nft", icon_custom_emoji_id=5380006756594243067)],
-                             
+        [InlineKeyboardButton(text="Пополнить Steam", callback_data="steam",icon_custom_emoji_id=5373144051690258848)],
         [
             InlineKeyboardButton(text="Поддержка", url=f"https://t.me/{SUPPORT_USERNAME[1:]}",
                                  icon_custom_emoji_id=6021798595739523148),
@@ -248,187 +251,160 @@ async def info_callback(callback: CallbackQuery, state: FSMContext):
     await save_and_delete_previous(callback.from_user.id, sent_message.message_id)
     await callback.answer()
 
-# ===== КОМАНДА /NFT =====
-@router.message(Command("nft"))
-async def cmd_nft(message: Message, state: FSMContext):
+@router.message(Command("steam"))
+async def steam_cmd(message: Message, state: FSMContext):
     await state.clear()
-
+    user_ids.add(message.from_user.id)
     text = (
-        "<tg-emoji emoji-id=\"5380006756594243067\">💎</tg-emoji><b>Подарки</b>\n\n"
-        "Выберите подарок из списка ниже:"
+        "<tg-emoji emoji-id=\"5373144051690258848\">📱</tg-emoji><b>Пополнение Steam</b>\n\n"
+        "<tg-emoji emoji-id=\"5447644880824181073\">⚠️</tg-emoji><b>Примечание: обязательно прочтите перед пополнением</b>\n"
+        "<blockquote>"
+        "<tg-emoji emoji-id=\"6021443182900812386\">🌎</tg-emoji><b>Регион аккаунта</b>\n\n"
+        "Страной Вашего аккаунта должна быть одна из стран СНГ (Казахстан, Узбекистан, Кыргызстан, Россия и т.д).\n\n"
+        "❗️Кроме Крыма, Луганска и Донецка — в данных регионах пополнение недоступно.\n\n"
+        "Для аккаунтов со странами Китай, Турция и другими, не входящими в СНГ странам — пополнение недоступно.\n\n"
+        "<tg-emoji emoji-id=\"5436113877181941026\">❓</tg-emoji><b>Что такое логин?</b>\n\n"
+        "Логин — это то что вы вводите при авторизации, у каждого пользователя он уникальный, а никнейм вы можете менять по своему усмотрению."
+        "<b>Не перепутайте ваш логин и никнейм.</b>"
+        "</blockquote>\n\n"
+        "<b>Введите логин Steam (тот, что используете при входе):</b>"
     )
-    
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="Новогодняя елка | 60₽", icon_custom_emoji_id=5346117566253276549, callback_data="gift_christmastree")],
-        [InlineKeyboardButton(text="Новогодний мишка | 60₽", icon_custom_emoji_id=5379850046122527013, callback_data="gift_newyearbear")],
-        [InlineKeyboardButton(text="Мишка 14 февраля | 60₽", icon_custom_emoji_id=5224509179334529299, callback_data="gift_14bear")],
-        [InlineKeyboardButton(text="Сердце 14 февраля | 60₽", icon_custom_emoji_id=5224648868850863664, callback_data="gift_14heart")],
         [InlineKeyboardButton(text="Назад", callback_data="menu")]
     ])
 
-    sent_message = await message.answer(text, reply_markup=keyboard)
-    
+    try:
+        photo = FSInputFile("images/steam.jpg")
+        sent_message = await message.answer_photo(photo=photo, caption=text, reply_markup=keyboard)
+    except:
+        sent_message = await message.answer(text, reply_markup=keyboard)
+
     await save_and_delete_previous(message.from_user.id, sent_message.message_id)
+    await state.set_state(Form.waiting_for_steam_login)
 
 
-# ===== ОБРАБОТЧИК ВЫБОРА ПОДАРКА =====
-@router.callback_query(F.data.startswith("gift_"))
-async def gift_selection(callback: CallbackQuery, state: FSMContext):
-    user_id = callback.from_user.id
-    
-    gifts = {
-        "gift_christmastree": {"name": "Новогодняя елка", "price": 60, "gift_id": 5956217000635139069},
-        "gift_newyearbear": {"name": "Новогодний мишка", "price": 60, "gift_id": 5922558454332916696},
-        "gift_14bear": {"name": "Мишка 14 февраля", "price": 60, "gift_id": 5800655655995968830},
-        "gift_14heart": {"name": "Сердце 14 февраля", "price": 60, "gift_id": 5801108895304779062},
-    }
-    
-    gift_key = callback.data
-    gift_info = gifts.get(gift_key)
-    
-    if not gift_info:
-        await callback.answer("❌ Подарок не найден", show_alert=True)
-        return
-    
-    save_user_data(user_id, "gift", {
-        'name': gift_info['name'],
-        'price': gift_info['price'],
-        'gift_id': gift_info['gift_id']
-    })
-    
-    text = (
-        f"<tg-emoji emoji-id=\"5380006756594243067\">💎</tg-emoji><b>Подарок: {gift_info['name']}</b>\n\n"
-        f"💰 Стоимость: {gift_info['price']}₽\n\n"
-        f"Для кого вы приобретаете подарок?"
-    )
-    
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="💫 Себе", callback_data="gift_self", icon_custom_emoji_id=5406604187683270743)],
-        [InlineKeyboardButton(text="🎁 Подарить другу", callback_data="gift_friend", icon_custom_emoji_id=5203996991054432397)],
-        [InlineKeyboardButton(text="Назад", callback_data="nft")]
-    ])
-    
-    await callback.message.edit_text(text, reply_markup=keyboard)
-    await callback.answer()
-
-
-# ===== ПОДАРОК СЕБЕ =====
-@router.callback_query(F.data == "gift_self")
-async def gift_self(callback: CallbackQuery):
-    user_id = callback.from_user.id
-    gift_data = get_user_data(user_id, "gift")
-    
-    if not gift_data:
-        await callback.answer("❌ Сначала выберите подарок", show_alert=True)
-        return
-    
-    username = callback.from_user.username
-    if not username:
-        username = f"id{user_id}"
-    else:
-        username = f"@{username}"
-    
-    text = (
-        f"<tg-emoji emoji-id=\"5380006756594243067\">💎</tg-emoji><b>Подарок: {gift_data['name']}</b>\n\n"
-        f"💰 Стоимость: {gift_data['price']}₽\n"
-        f"👤 Получатель: {username}\n\n"
-        f"Выберите способ оплаты:"
-    )
-    
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="СБП", callback_data=f"sbp_gift_self_{gift_data['price']}", icon_custom_emoji_id=5305413839066525446)],
-        [InlineKeyboardButton(text="❌ Отмена", callback_data="nft")]
-    ])
-    
-    await callback.message.edit_text(text, reply_markup=keyboard)
-    await callback.answer()
-
-
-# ===== ПОДАРОК ДРУГУ =====
-@router.callback_query(F.data == "gift_friend")
-async def gift_friend(callback: CallbackQuery, state: FSMContext):
-    user_id = callback.from_user.id
-    gift_data = get_user_data(user_id, "gift")
-    
-    if not gift_data:
-        await callback.answer("❌ Сначала выберите подарок", show_alert=True)
-        return
-    
-    text = (
-        f"<tg-emoji emoji-id=\"5380006756594243067\">💎</tg-emoji><b>Подарок: {gift_data['name']}</b>\n\n"
-        f"💰 Стоимость: {gift_data['price']}₽\n\n"
-        f"👤 Введите @username получателя:"
-    )
-    
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="Назад", callback_data="nft")]
-    ])
-    
-    await callback.message.edit_text(text, reply_markup=keyboard)
-    await state.set_state("waiting_for_gift_username")
-    await callback.answer()
-
-
-# ===== ОБРАБОТКА USERNAME ДЛЯ ПОДАРКА =====
-@router.message(Form.waiting_for_gift_username)
-async def process_gift_username(message: Message, state: FSMContext):
+@router.message(Form.waiting_for_steam_login)
+async def process_steam_login(message: Message, state: FSMContext):
     await delete_user_message(message.from_user.id, message.message_id)
-    
-    username = message.text.strip()
-    if not username:
-        error_msg = await message.answer("❌ Пожалуйста, введите username")
+
+    steam_login = message.text.strip()
+
+    # Простая проверка на пустоту
+    if not steam_login:
+        error_msg = await message.answer("❌ Пожалуйста, введите логин Steam")
         await save_and_delete_previous(message.from_user.id, error_msg.message_id)
         await asyncio.sleep(2)
         await delete_user_message(message.from_user.id, error_msg.message_id)
         return
-    
-    from username_checker import check_username
-    
-    check_msg = await message.answer("🔍 Проверяю пользователя...")
-    result = await check_username(username)
+
+    # Проверка через парсинг
+    check_msg = await message.answer("🔍 Проверяю логин в Steam...")
+
+    login_exists = await check_steam_login_exists(steam_login)
+
     await delete_user_message(message.from_user.id, check_msg.message_id)
-    
-    if not result['exists']:
-        error_text = f"❌ Пользователь {username} не найден"
-        keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="🔄 Попробовать снова", callback_data="gift_friend")]
-        ])
-        sent_message = await message.answer(error_text, reply_markup=keyboard)
-        await save_and_delete_previous(message.from_user.id, sent_message.message_id)
-        await state.clear()
+
+    if not login_exists:
+        error_msg = await message.answer(
+            "❌ Логин не найден в Steam\n\n"
+            "Проверьте правильность ввода.\n"
+            "Логин — это то, что вы вводите при входе в Steam, а не никнейм.\n\n"
+            "Попробуйте еще раз:"
+        )
+        await save_and_delete_previous(message.from_user.id, error_msg.message_id)
+        await asyncio.sleep(3)
+        await delete_user_message(message.from_user.id, error_msg.message_id)
         return
-    
-    if not username.startswith('@'):
-        username = f"@{username}"
-    
-    user_id = message.from_user.id
-    gift_data = get_user_data(user_id, "gift")
-    
-    if not gift_data:
-        await message.answer("❌ Ошибка данных")
-        await state.clear()
-        return
-    
+
+    # Логин найден - сохраняем
+    save_user_data(message.from_user.id, "steam_login", steam_login)
+
+    # Вопрос про сумму пополнения
     text = (
-        f"<tg-emoji emoji-id=\"5380006756594243067\">💎</tg-emoji><b>Подарок: {gift_data['name']}</b>\n\n"
-        f"💰 Стоимость: {gift_data['price']}₽\n"
-        f"👤 Получатель: {username}\n\n"
-        f"Выберите способ оплаты:"
+        f"<tg-emoji emoji-id=\"5373144051690258848\">📱</tg-emoji><b>Пополнение Steam</b>\n\n"
+        f"<b>Логин:</b> <code>{steam_login}</code>\n\n"
+        f"Введите сумму пополнения в рублях (от 100 до 5000):"
     )
-    
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="СБП", callback_data=f"sbp_gift_friend_{gift_data['price']}_{username}", icon_custom_emoji_id=5305413839066525446)],
-        [InlineKeyboardButton(text="❌ Отмена", callback_data="nft")]
-    ])
-    
-    sent_message = await message.answer(text, reply_markup=keyboard)
+
+    sent_message = await message.answer(text, parse_mode="HTML")
     await save_and_delete_previous(message.from_user.id, sent_message.message_id)
+    await state.set_state(Form.waiting_for_steam_amount)
+
+
+@router.message(Form.waiting_for_steam_amount)
+async def process_steam_amount(message: Message, state: FSMContext):
+    await delete_user_message(message.from_user.id, message.message_id)
+
+    try:
+        amount = int(message.text.strip())
+
+        if amount < 100 or amount > 5000:
+            error_msg = await message.answer("❌ Сумма должна быть от 100 до 5000 рублей")
+            await save_and_delete_previous(message.from_user.id, error_msg.message_id)
+            await asyncio.sleep(2)
+            await delete_user_message(message.from_user.id, error_msg.message_id)
+            return
+
+        user_id = message.from_user.id
+        steam_login = get_user_data(user_id, "steam_login")
+
+        save_user_data(user_id, "steam", {
+            "steam_amount": amount,
+            "steam_login": steam_login
+        })
+
+        text = (
+            f"<tg-emoji emoji-id=\"5373144051690258848\">📱</tg-emoji><b>Пополнение Steam</b>\n\n"
+            f"<b>Логин:</b> <code>{steam_login}</code>\n"
+            f"<b>Сумма пополнения:</b> {amount}₽\n"
+            f"<b>Сумма к оплате: {amount*1.05}₽</b>\n"
+            f"<tg-emoji emoji-id=\"5447644880824181073\">⚠️</tg-emoji><b>Примечание:</b>\n"
+            f"<blockquote>"
+            f"Из-за двойной конвертации (из рублей в доллары, из долларов в валюту аккаунта) до 10% от суммы платежа уйдёт на обмен валют.</blockquote>\n\n"
+            f"<b>Выберите способ оплаты:</b>"
+        )
+
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="СБП", callback_data=f"sbp_steam_self_{amount}", icon_custom_emoji_id=5305413839066525446)],
+            [InlineKeyboardButton(text="CryptoBot", callback_data=f"crypto_steam_{round(amount / 0.97, 1)}", icon_custom_emoji_id=5361914370068613491)],
+            [InlineKeyboardButton(text="❌Отмена", callback_data="menu")]
+        ])
+
+        sent_message = await message.answer(text, reply_markup=keyboard, parse_mode="HTML")
+        await save_and_delete_previous(user_id, sent_message.message_id)
         await state.clear()
+
+    except ValueError:
+        error_msg = await message.answer("❌ Введите число")
+        await save_and_delete_previous(message.from_user.id, error_msg.message_id)
+        await asyncio.sleep(2)
+        await delete_user_message(message.from_user.id, error_msg.message_id)
+
+
+# ===== ФУНКЦИЯ ПРОВЕРКИ STEAM ЛОГИНА ЧЕРЕЗ ПАРСИНГ =====
+async def check_steam_login_exists(login: str) -> bool:
+    """Проверяет существует ли логин в Steam через парсинг"""
+    try:
+        import aiohttp
+        url = f"https://steamcommunity.com/id/{login}"
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, headers=headers, timeout=10, allow_redirects=True) as resp:
+                html = await resp.text()
+                return 'actual_persona_name' in html or 'persona_name' in html
+    except:
+        return False
+
+
+
 
 # ===== КОМАНДА /STARS =====
 @router.message(Command("stars"))
 async def stars_cmd(message: Message, state: FSMContext):
     await state.clear()
+    user_ids.add(message.from_user.id)
 
     text = (
         "<tg-emoji emoji-id=\"5438391541288689158\">⭐️</tg-emoji><b>Telegram Stars</b>\n\n"
@@ -460,7 +436,7 @@ async def process_stars_amount(message: Message, state: FSMContext):
     try:
         star_value = int(message.text.strip())
 
-        if star_value < 1 or star_value > 1000000:
+        if star_value < 50 or star_value > 1000000:
             error_msg = await message.answer("❌ Количество должно быть от 50 до 1,000,000")
             await save_and_delete_previous(message.from_user.id, error_msg.message_id)
             await asyncio.sleep(2)
@@ -468,7 +444,7 @@ async def process_stars_amount(message: Message, state: FSMContext):
             return
 
         # Расчет стоимости
-        formulastar = round(star_value * 1.65, 1)
+        formulastar = round(star_value * 1.5, 1)
 
         # Сохраняем данные
         save_user_data(message.from_user.id, "stars", {
@@ -726,19 +702,17 @@ async def process_friend_username(message: Message, state: FSMContext):
     await save_and_delete_previous(message.from_user.id, sent_message.message_id)
     await state.clear()
 
-
-# ===== ВСЁ ДЛЯ TON (ОДНИМ БЛОКОМ) =====
-
 # ===== КОМАНДА /TON =====
 @router.message(Command("ton"))
 async def ton_cmd(message: Message, state: FSMContext):
     await state.clear()
+    user_ids.add(message.from_user.id)
     global TON_RUB
     TON_RUB = await get_ton_price()
 
     text = (
         f"<tg-emoji emoji-id=\"5438332129006081114\">💎</tg-emoji><b>TON</b>\n\n"
-        f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Курс к рублю:</b> {round(TON_RUB + 25, 2)}₽\n"
+        f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Курс к рублю:</b> {round(TON_RUB + 20, 2)}₽\n"
         f"<tg-emoji emoji-id=\"5447644880824181073\">⚠️</tg-emoji>️<b>Примечание:</b> TON поступает не на кошелек, а на Telegram аккаунт по @username."
         f"Использовать TON можно <b>только</b> в качестве покупки подарков на Telegram маркете, "
         f"а так же для оплаты за посты в Telegram каналах!\n\n"
@@ -974,6 +948,7 @@ async def process_ton_friend(message: Message, state: FSMContext):
 # ===== КОМАНДА /PREMIUM =====
 @router.message(Command("premium"))
 async def premium_cmd(message: Message):
+    user_ids.add(message.from_user.id)
     text = ("<tg-emoji emoji-id=\"5402352097045795954\">👑</tg-emoji><b>Telegram Premium</b>\n\n"
             "<tg-emoji emoji-id=\"5274055917766202507\">🗓</tg-emoji>Выберите период подписки:")
 
@@ -1007,9 +982,9 @@ async def premium_period_callback(callback: CallbackQuery, state: FSMContext):
     }
 
     prices = {
-        "premium_12": 2999,
-        "premium_6": 1699,
-        "premium_3": 1299
+        "premium_12": 2800,
+        "premium_6": 1500,
+        "premium_3": 1200
     }
 
     period = periods.get(callback.data, "3 месяца")
@@ -1261,6 +1236,12 @@ async def menu_btn(callback: CallbackQuery):
     await menu_cmd(callback.message)
     await callback.answer()
 
+@router.callback_query(F.data == "steam")
+async def steam_btn(callback: CallbackQuery, state: FSMContext):
+    if not await require_subscription_callback(callback):
+        return
+    await steam_cmd(callback.message, state)
+    await callback.answer()
 
 @router.callback_query(F.data == "stars")
 async def stars_btn(callback: CallbackQuery, state: FSMContext):
@@ -1288,12 +1269,6 @@ async def premium_btn(callback: CallbackQuery):
     await premium_cmd(callback.message)
     await callback.answer()
 
-@router.callback_query(F.data == "nft")
-async def nft_btn(callback: CallbackQuery, state: FSMContext):
-    if not await require_subscription_callback(callback):
-        return
-    await cmd_nft(callback.message, state)
-    await callback.answer()
 
 @router.callback_query(F.data.startswith("crypto_"))
 async def crypto_payment(callback: CallbackQuery):
@@ -1321,13 +1296,13 @@ async def crypto_payment(callback: CallbackQuery):
     if ptype == "stars" and stars_data:
         star_value = stars_data.get('star_value', '?')
         description = f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> {star_value} звёзд"
-        base_price = round(star_value * 1.65, 1)
+        base_price = round(star_value * 1.5, 1)
         commission = round(amount - base_price, 1)
 
     elif ptype == "premium" and premium_data:
         period = premium_data.get('period', 'Premium')
         description = f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> Telegram Premium на {period}"
-        base_prices = {"12 месяцев": 3000, "6 месяцев": 1700, "3 месяца": 1300}
+        base_prices = {"12 месяцев": 2800, "6 месяцев": 1500, "3 месяца": 1200}
         base_price = base_prices.get(period, amount)
         commission = round(amount - base_price, 1)
 
@@ -1366,7 +1341,7 @@ async def crypto_payment(callback: CallbackQuery):
         text = (
             f"<tg-emoji emoji-id=\"5361914370068613491\">👛</tg-emoji><b>CryptoBot</b>\n\n"
             f"{description}\n"
-            f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Сумма:</b> {round(amount/0.97, 1)}₽ (комиссия {round(commission, 2)}₽)\n"
+            f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Сумма:</b> {round(amount, 1)}₽ (комиссия {round(commission, 2)}₽)\n"
             f"<tg-emoji emoji-id=\"5274099962655816924\">❗️</tg-emoji><b>Комиссия:</b>3%\n\n"
             f"👇Нажмите кнопку для оплаты:"
         )
@@ -1471,6 +1446,7 @@ async def sbp_payment(callback: CallbackQuery):
     stars_data = get_user_data(user_id, "stars")
     premium_data = get_user_data(user_id, "premium")
     ton_data = get_user_data(user_id, "ton_purchase")
+    steam_data = get_user_data(user_id, "steam")
 
     # 👇 ПОЛУЧАЕМ USERNAME
     username = callback.from_user.username
@@ -1486,62 +1462,56 @@ async def sbp_payment(callback: CallbackQuery):
     description = f"Оплата {amount}₽"
     base_price = amount
     final_amount = amount
-    quantity = "1"
 
-        # Определяем описание и разделяем цены для каждого типа товара
+    # Определяем описание и разделяем цены для каждого типа товара
     if ptype == "stars" and stars_data:
-        star_value = stars_data.get('star_value', 1)
-        quantity = str(star_value)
+        star_value = stars_data.get('star_value', '?')
         description = f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> {star_value} звёзд"
-        base_price = round(star_value * 1.65, 1)
+        base_price = round(star_value * 1.5, 1)
         final_amount = round(base_price / 0.92, 1)
 
     elif ptype == "premium" and premium_data:
         period = premium_data.get('period', 'Premium')
         priceprem = premium_data.get('priceprem', amount)
-        quantity = "12" if period == "12 месяцев" else "6" if period == "6 месяцев" else "3"
         description = f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> Telegram Premium на {period}"
         base_prices = {
-            "12 месяцев": 2999,
-            "6 месяцев": 1699,
-            "3 месяца": 1299
+            "12 месяцев": 2799,
+            "6 месяцев": 1499,
+            "3 месяца": 1199
         }
         base_price = base_prices.get(period, priceprem)
         final_amount = round(base_price / 0.92, 1)
 
     elif ptype == "ton" and ton_data:
-        ton_value = ton_data.get('ton_value', 1)
-        quantity = str(ton_value)
+        ton_value = ton_data.get('ton_value', '?')
         description = f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> {ton_value} TON"
-        base_price = round(ton_value * (TON_RUB + 30), 1)
+        base_price = round(ton_value * (TON_RUB + 20), 1)
         final_amount = round(base_price / 0.92, 1)
 
-    elif ptype == "gift":
-        gift_data = get_user_data(user_id, "gift")
-        if gift_data:
-            quantity = "1"
-            description = f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Подарок: {gift_data['name']}</b>"
-            base_price = gift_data['price']
-            final_amount = round(base_price / 0.92, 1)
-            gift_id = gift_data['gift_id']
-        else:
-            await callback.answer("❌ Ошибка: подарок не выбран", show_alert=True)
-            return
+    elif ptype == "steam" and steam_data:
+        steam_amount = steam_data.get('steam_amount', amount)
+        steam_login = steam_data.get('steam_login', '?')
+        description = (f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> Пополнение Steam на {steam_amount}₽\n"
+                       f"<tg-emoji emoji-id=\"5255975823436973213\">🎁</tg-emoji><b>Логин:</b> <code>{steam_login}</code>")
+        base_price = float(steam_amount * 1.05)
+        final_amount = round(base_price / 0.92, 1)
 
-    # Формируем payload для вебхука (тип_количество_сумма_получатель)
-    payload = f"{ptype}_{quantity}_{round(final_amount, 1)}_{username}"
+    else:
+        await callback.answer("❌ Ошибка: данные не найдены", show_alert=True)
+        return
+
+    order_id = f"{ptype}_{user_id}_{int(time.time())}"
 
     wait_msg = await callback.message.answer("Создаю ссылку для оплаты...")
 
     from username_checker import create_platega_invoice
 
-    # Описание для Platega
-    platega_description = f"Спасибо за покупку! Ждем вас снова в SpireShop"
+    platega_description = f"{ptype.upper()} {round(final_amount, 1)}₽"
 
     result = await create_platega_invoice(
         amount_rub=final_amount,
         description=platega_description,
-        order_id=payload
+        order_id=order_id
     )
 
     await delete_user_message(user_id, wait_msg.message_id)
@@ -1552,11 +1522,13 @@ async def sbp_payment(callback: CallbackQuery):
             f"{description}\n"
             f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Сумма к оплате:</b> {round(final_amount, 1)}₽ (комиссия {round(final_amount - base_price, 1)}₽)\n"
             f"<tg-emoji emoji-id=\"5274099962655816924\">❗️</tg-emoji><b>Комиссия сервиса:</b> 8%\n\n"
-            f"👇Нажмите кнопку для оплаты:"
+            f"👇Нажмите кнопку для оплаты, а после подтвердите оплату, нажав на \"<tg-emoji emoji-id=\"5206607081334906820\">✔️</tg-emoji>Оплатил\""
         )
 
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="Оплатить", url=result["pay_url"])],
+            [InlineKeyboardButton(text="Оплатил", callback_data=f"paid_{ptype}_{final_amount}_{username}",
+                                  icon_custom_emoji_id=5206607081334906820)],
             [InlineKeyboardButton(text="❌Отмена", callback_data=ptype)]
         ])
 
@@ -1566,288 +1538,390 @@ async def sbp_payment(callback: CallbackQuery):
         await callback.message.answer(f"❌ Ошибка: {result.get('error')}")
 
     await callback.answer()
-# ===== ХРАНИЛИЩЕ ДЛЯ ВЕБХУКА =====
-processed_webhooks = set()
 
-# ===== ВЕБХУК ДЛЯ PLATEGA =====
-async def platega_webhook(request):
-    try:
-        data = await request.json()
-        print(f"📩 Platega webhook: {json.dumps(data, indent=2)}")
-        
-        transaction_id = data.get('transactionId')
-        status = data.get('status')
-        payload = data.get('payload', '')
-        
-        # Защита от дубликатов
-        if transaction_id in processed_webhooks:
-            print(f"⚠️ Дубликат {transaction_id}, игнорируем")
-            return web.Response(text="OK", status=200)
-        processed_webhooks.add(transaction_id)
-        
-        if status == 'SUCCESS' and payload:
-            parts = payload.split('_')
-            print(f"📦 Payload части: {parts}")
-            
-            # Формат: тип_данные_сумма_получатель
-            if len(parts) >= 3:
-                ptype = parts[0]        # stars, premium, ton, gift
-                quantity = parts[1]      # количество или gift_id
-                amount = float(parts[2])  # сумма
-                recipient = parts[3] if len(parts) > 3 else None
-                
-                # Получаем ID пользователя из payload или из данных
-                user_id = None
-                if recipient:
-                    # Пытаемся найти пользователя по username
-                    try:
-                        user = await bot.get_chat(recipient)
-                        user_id = user.id
-                    except:
-                        # Если не нашли — возможно ID в payload
-                        pass
-                
-                # ===== ОБРАБОТКА ПОДАРКА =====
-                if ptype == "gift":
-                    gift_id = int(quantity)
-                    
-                    # Отправляем подарок через Telethon
-                    from username_checker import send_telegram_gift
-                    
-                    gift_result = await send_telegram_gift(
-                        receiver_username=recipient.replace('@', ''),
-                        gift_id=gift_id,
-                        text="Поздравляю с подарком! 🎁"
-                    )
-                    
-                    if gift_result["success"]:
-                        # Уведомление покупателю (если знаем user_id)
-                        if user_id:
-                            await bot.send_message(
-                                user_id,
-                                f"✅ Подарок отправлен {recipient}!\nСпасибо за покупку!\n/menu — вернуться в меню",
-                                parse_mode="HTML"
-                            )
-                        
-                        # Уведомление админу
-                        admin_text = (
-                            f"🎁 <b>ПОДАРОК ОТПРАВЛЕН</b>\n\n"
-                            f"👤 <b>Получатель:</b> {recipient}\n"
-                            f"🆔 <b>ID подарка:</b> {gift_id}\n"
-                            f"💵 <b>Сумма:</b> {amount}₽\n"
-                            f"🧾 <b>Транзакция:</b> <code>{transaction_id}</code>\n"
-                            f"⏱ <b>Время:</b> {time.strftime('%Y-%m-%d %H:%M:%S')}"
-                        )
-                        await bot.send_message(ADMIN_ID, admin_text, parse_mode="HTML")
-                        print(f"✅ Подарок отправлен {recipient}")
-                    else:
-                        # Ошибка отправки подарка
-                        error_text = f"❌ Ошибка отправки подарка: {gift_result.get('error')}"
-                        if user_id:
-                            await bot.send_message(user_id, error_text)
-                        print(f"❌ Ошибка: {gift_result.get('error')}")
-                
-                # ===== ОБРАБОТКА ЗВЁЗД, PREMIUM, TON =====
-                else:
-                    # Название товара на русском
-                    product_names = {
-                        "stars": "Звёзды",
-                        "premium": "Premium",
-                        "ton": "TON"
-                    }
-                    product_name = product_names.get(ptype, ptype.upper())
-                    
-                    # Уведомление пользователю
-                    if user_id:
-                        user_text = (
-                            f"✅ <b>Оплата подтверждена!</b>\n\n"
-                            f"📦 <b>Товар:</b> {product_name}\n"
-                            f"🔢 <b>Количество:</b> {quantity}\n"
-                            f"💵 <b>Сумма:</b> {amount}₽\n\n"
-                            f"Спасибо за покупку!\n/menu — вернуться в меню"
-                        )
-                        await bot.send_message(user_id, user_text, parse_mode="HTML")
-                    
-                    # Уведомление админу
-                    admin_text = (
-                        f"💰 <b>НОВЫЙ ПЛАТЁЖ</b>\n\n"
-                        f"👤 <b>Пользователь:</b> {recipient or 'неизвестно'}\n"
-                        f"🆔 <b>ID:</b> <code>{user_id or 'неизвестно'}</code>\n"
-                        f"📦 <b>Товар:</b> {product_name}\n"
-                        f"🔢 <b>Количество:</b> {quantity}\n"
-                        f"💵 <b>Сумма:</b> {amount}₽\n"
-                        f"🧾 <b>Транзакция:</b> <code>{transaction_id}</code>\n"
-                        f"⏱ <b>Время:</b> {time.strftime('%Y-%m-%d %H:%M:%S')}"
-                    )
-                    await bot.send_message(ADMIN_ID, admin_text, parse_mode="HTML")
-                    print(f"✅ Платёж подтверждён: {ptype} {quantity} за {amount}₽")
-        
-        return web.Response(text="OK", status=200)
-        
-    except Exception as e:
-        print(f"❌ Ошибка webhook: {e}")
-        import traceback
-        traceback.print_exc()
-        return web.Response(text="Error", status=500)
-
-# ===== АДМИН-ПАНЕЛЬ =====
-@router.message(Command("admin"))
-async def admin_panel(message: Message):
-    # Проверка что это админ
-    if message.from_user.id != ADMIN_ID:
-        await message.answer("❌ У вас нет доступа к админ-панели")
+# ===== КНОПКА "Я ОПЛАТИЛ" =====
+@router.callback_query(F.data.startswith("paid_"))
+async def paid_callback(callback: CallbackQuery):
+    # 👇 ПРОВЕРКА ПОДПИСКИ
+    if not await require_subscription_callback(callback):
         return
 
-    text = (
-        f"<b> АДМИН-ПАНЕЛЬ</b>\n\n"
-        f"Выберите действие:"
-    )
+    user_id = callback.from_user.id
+    parts = callback.data.split("_")
+
+    if len(parts) >= 4:  # формат: paid_тип_сумма_получатель
+        ptype = parts[1]  # stars, premium, ton, steam
+        amount = parts[2]  # сумма
+        recipient = parts[3]  # получатель (@username или id)
+
+        await delete_user_message(user_id, callback.message.message_id)
+
+        # Название товара на русском
+        product_names = {
+            "stars": "Звёзды",
+            "premium": "Premium",
+            "ton": "TON",
+            "steam": "Steam"
+        }
+        product_name = product_names.get(ptype, ptype.upper())
+
+        # Формируем текст заказа в зависимости от типа
+        if ptype == "steam":
+            # Для Steam получаем логин из сохраненных данных
+            steam_data = get_user_data(user_id, "steam")
+            steam_login = steam_data.get('steam_login', 'Не указан') if steam_data else 'Не указан'
+            steam_amount = steam_data.get('steam_amount', amount) if steam_data else amount
+
+            order_text = (
+                f"💰 <b>НОВЫЙ ЗАКАЗ</b>\n\n"
+                f"🎮 <b>Логин Steam:</b> <code>{steam_login}</code>\n"
+                f"💰 <b>Сумма пополнения:</b> {steam_amount}₽\n"
+                f"👤 <b>Покупатель:</b> {recipient}\n"
+                f"📦 <b>Товар:</b> {product_name}\n"
+                f"⏱ <b>Время оплаты:</b> {time.strftime('%Y-%m-%d %H:%M:%S')}"
+            )
+        else:
+            order_text = (
+                f"💰 <b>НОВЫЙ ЗАКАЗ</b>\n\n"
+                f"🎁 <b>Получатель:</b> {recipient}\n"
+                f"📦 <b>Товар:</b> {product_name}\n"
+                f"💵 <b>Сумма:</b> {amount}₽\n"
+                f"⏱ <b>Время оплаты:</b> {time.strftime('%Y-%m-%d %H:%M:%S')}"
+            )
+
+        # 👇 ОТПРАВЛЯЕМ ТЕБЕ В ЛИЧКУ
+        await callback.bot.send_message(
+            chat_id=ADMIN_ID,
+            text=order_text,
+            parse_mode="HTML"
+        )
+
+        # Благодарность покупателю
+        await callback.message.answer(
+            f"<b>Спасибо за покупку!</b>\n\n"
+            f"Ваш заказ принят и передан администратору.\n"
+            f"Ждем вас снова в SpireShop<tg-emoji emoji-id=\"5368469082867769478\">😘</tg-emoji>"
+        )
+
+        await callback.answer("✅ Заказ отправлен")
+    else:
+        await callback.answer("❌ Ошибка данных", show_alert=True)
+
+
+# ===== АДМИН-ПАНЕЛЬ (РАБОЧАЯ) =====
+@router.message(Command("admin"))
+async def admin_panel(message: Message, state: FSMContext):
+    if message.from_user.id != ADMIN_ID:
+        await message.answer("Доступ запрещен")
+        return
+
+    await state.clear()
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="Сделать рассылку", callback_data="admin_broadcast")],
-        [InlineKeyboardButton(text="Изменить цены", callback_data="admin_prices")],
-        [InlineKeyboardButton(text="Закрыть", callback_data="menu")]
+        [InlineKeyboardButton(text="Создать рассылку", callback_data="create_broadcast")],
+        [InlineKeyboardButton(text="Статистика", callback_data="show_stats")],
+        [InlineKeyboardButton(text="Закрыть", callback_data="close_panel")]
     ])
 
-    await message.answer(text, reply_markup=keyboard, parse_mode="HTML")
-
-
-# ===== ОБРАБОТЧИКИ АДМИНКИ =====
-@router.callback_query(F.data == "admin_broadcast")
-async def admin_broadcast(callback: CallbackQuery, state: FSMContext):
-    if callback.from_user.id != ADMIN_ID:
-        await callback.answer("❌ Нет доступа", show_alert=True)
-        return
-    
-    await callback.message.edit_text(
-        f"<b>РАССЫЛКА</b>\n\n"
-        f"Всего пользователей: {len(user_ids)}\n\n"
-        f"Введите текст для рассылки (можно использовать HTML):"
+    await message.answer(
+        f"Админ панель\n\nПользователей: {len(user_ids)}",
+        reply_markup=keyboard
     )
-    
-    await state.set_state("waiting_broadcast_text")
+
+
+@router.callback_query(F.data == "create_broadcast")
+async def create_broadcast(callback: CallbackQuery, state: FSMContext):
+    if callback.from_user.id != ADMIN_ID:
+        await callback.answer("Доступ запрещен")
+        return
+
+    await callback.message.edit_text(
+        "ШАГ 1: ОТПРАВЬТЕ ФОТО\n\nДля отмены: /cancel"
+    )
+    await state.set_state(AdminStates.waiting_for_photo)
     await callback.answer()
 
-@router.message(StateFilter("waiting_broadcast_text"))
-async def process_broadcast(message: Message, state: FSMContext):
+
+@router.message(AdminStates.waiting_for_photo, F.photo)
+async def get_photo(message: Message, state: FSMContext):
     if message.from_user.id != ADMIN_ID:
         await state.clear()
         return
-    
-    text = message.html_text
-    
-    status_msg = await message.answer(f"📢 Начинаю рассылку {len(user_ids)} пользователям...")
-    
-    sent = 0
-    failed = 0
-    
-    for user_id in user_ids:
-        try:
-            await bot.send_message(user_id, text, parse_mode="HTML")
-            sent += 1
-            if sent % 10 == 0:
-                await status_msg.edit_text(f"📢 Отправлено: {sent}/{len(user_ids)}")
-            await asyncio.sleep(0.05)
-        except Exception as e:
-            failed += 1
-            print(f"❌ Ошибка отправки {user_id}: {e}")
-    
-    await status_msg.edit_text(
-        f"<b>Рассылка завершена!</b>\n\n"
-        f"Отправлено: {sent}\n"
-        f" Не удалось: {failed}\n"
-        f" Всего: {len(user_ids)}",
+
+    photo = message.photo[-1]
+    await state.update_data(photo_id=photo.file_id)
+
+    await message.answer(
+        "ШАГ 2: ВВЕДИТЕ ТЕКСТ\n\nМожно использовать HTML: <b>жирный</b>, <i>курсив</i>",
         parse_mode="HTML"
     )
-    
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🔙 Назад в админку", callback_data="admin_back")]
-    ])
-    await message.answer("Что дальше?", reply_markup=keyboard)
-    await state.clear()
+    await state.set_state(AdminStates.waiting_for_text)
 
 
-@router.message(StateFilter("waiting_price_change"))
-async def change_price(message: Message, state: FSMContext):
+@router.message(AdminStates.waiting_for_photo)
+async def photo_error(message: Message):
+    if message.from_user.id != ADMIN_ID:
+        return
+    await message.answer("Ошибка: отправьте фото")
+
+
+@router.message(AdminStates.waiting_for_text)
+async def get_text(message: Message, state: FSMContext):
     if message.from_user.id != ADMIN_ID:
         await state.clear()
         return
-    
+
+    text = message.html_text if message.html_text else message.text
+    await state.update_data(broadcast_text=text)
+
+    await message.answer(
+        "ШАГ 3: ВВЕДИТЕ ТЕКСТ КНОПКИ\n\nПример: Главное меню"
+    )
+    await state.set_state(AdminStates.waiting_for_button)
+
+
+@router.message(AdminStates.waiting_for_button)
+async def get_button(message: Message, state: FSMContext):
+    if message.from_user.id != ADMIN_ID:
+        await state.clear()
+        return
+
+    button_text = message.text.strip()
+    if not button_text:
+        await message.answer("Введите текст кнопки")
+        return
+
+    await state.update_data(button_text=button_text)
+
+    await message.answer(
+        "ШАГ 4: ВВЕДИТЕ CALLBACK_DATA\n\n"
+        "Варианты:\n"
+        "menu - главное меню\n"
+        "stars - купить звезды\n"
+        "ton - купить TON\n"
+        "premium - купить Premium"
+    )
+    await state.set_state(AdminStates.waiting_for_callback)
+
+
+@router.message(AdminStates.waiting_for_callback)
+async def get_callback(message: Message, state: FSMContext):
+    if message.from_user.id != ADMIN_ID:
+        await state.clear()
+        return
+
+    callback_data = message.text.strip()
+    await state.update_data(callback_data=callback_data)
+
+    data = await state.get_data()
+    broadcast_text = data.get("broadcast_text")
+    button_text = data.get("button_text")
+    photo_id = data.get("photo_id")
+
+    # Создаем клавиатуру
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=button_text, callback_data=callback_data)]
+    ])
+
+    # Предпросмотр
+    await message.answer("ПРЕДПРОСМОТР:")
+
     try:
-        parts = message.text.strip().split()
-        if len(parts) != 2:
-            raise ValueError
-        
-        key = parts[0]
-        value = float(parts[1])
-        
-        if key in PRICES:
-            PRICES[key] = value
-            await message.answer(f"✅ Цена <b>{key}</b> изменена на {value}₽", parse_mode="HTML")
-            
-            # Обновляем глобальные переменные, которые используют цены
-            global formulastar, priceprem, TON_RUB
-            # Здесь можно обновить и другие переменные, если нужно
-            
-        else:
-            await message.answer(f"❌ Неизвестный товар: {key}\nДоступно: {', '.join(PRICES.keys())}")
-            
+        await message.answer_photo(
+            photo=photo_id,
+            caption=broadcast_text,
+            reply_markup=keyboard,
+            parse_mode="HTML"
+        )
     except:
-        await message.answer("❌ Неверный формат\nПример: <code>stars 1.7</code>", parse_mode="HTML")
-    
+        clean_text = broadcast_text.replace('<', '').replace('>', '')
+        await message.answer_photo(
+            photo=photo_id,
+            caption=clean_text,
+            reply_markup=keyboard
+        )
+
+    # Сохраняем keyboard в state
+    await state.update_data(keyboard=keyboard)
+
+    # Кнопки подтверждения
+    confirm_keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="ОТПРАВИТЬ", callback_data="confirm_send")],
+        [InlineKeyboardButton(text="ОТМЕНА", callback_data="cancel_broadcast")]
+    ])
+
+    await message.answer(
+        f"ПОЛУЧАТЕЛЕЙ: {len(user_ids)}\n\nОтправить?",
+        reply_markup=confirm_keyboard
+    )
+
+
+@router.callback_query(F.data == "confirm_send")
+async def confirm_send(callback: CallbackQuery, state: FSMContext):
+    if callback.from_user.id != ADMIN_ID:
+        await callback.answer("Доступ запрещен")
+        return
+
+    await callback.answer("Отправка...")
+
+    # Получаем данные из state
+    data = await state.get_data()
+    broadcast_text = data.get("broadcast_text")
+    keyboard = data.get("keyboard")
+    photo_id = data.get("photo_id")
+
+    # Проверяем данные
+    if not broadcast_text:
+        await callback.message.edit_text("Ошибка: нет текста")
+        return
+    if not keyboard:
+        await callback.message.edit_text("Ошибка: нет кнопки")
+        return
+    if not photo_id:
+        await callback.message.edit_text("Ошибка: нет фото")
+        return
+
+    if len(user_ids) == 0:
+        await callback.message.edit_text("Ошибка: нет пользователей")
+        return
+
+    # Статусное сообщение
+    status_msg = await callback.message.edit_text(
+        f"Отправка 0/{len(user_ids)}"
+    )
+
+    sent = 0
+    failed = 0
+    user_list = list(user_ids)
+
+    for i, user_id in enumerate(user_list, 1):
+        try:
+            # Отправляем фото с клавиатурой
+            await callback.bot.send_photo(
+                chat_id=user_id,
+                photo=photo_id,
+                caption=broadcast_text,
+                reply_markup=keyboard,
+                parse_mode="HTML"
+            )
+            sent += 1
+
+        except Exception as e:
+            error = str(e)
+
+            # Если ошибка в HTML, пробуем без HTML
+            if "parse" in error.lower() or "entities" in error.lower():
+                try:
+                    clean_text = broadcast_text.replace('<', '').replace('>', '')
+                    await callback.bot.send_photo(
+                        chat_id=user_id,
+                        photo=photo_id,
+                        caption=clean_text,
+                        reply_markup=keyboard
+                    )
+                    sent += 1
+                except:
+                    failed += 1
+            else:
+                failed += 1
+
+        # Обновляем статус каждые 5 сообщений
+        if i % 5 == 0 or i == len(user_list):
+            await status_msg.edit_text(
+                f"Отправлено: {sent}/{len(user_list)}\nОшибок: {failed}"
+            )
+
+        await asyncio.sleep(0.05)
+
+    # Финальный отчет
+    await status_msg.edit_text(
+        f"ГОТОВО!\n\n"
+        f"Отправлено: {sent}\n"
+        f"Ошибок: {failed}\n"
+        f"Всего: {len(user_list)}"
+    )
+
+    # Кнопка назад
+    back_keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="Назад в админку", callback_data="back_to_admin")]
+    ])
+    await callback.message.answer("Выберите действие", reply_markup=back_keyboard)
+
     await state.clear()
 
 
-
-@router.callback_query(F.data == "admin_prices")
-async def admin_prices(callback: CallbackQuery, state: FSMContext):
-    if callback.from_user.id != ADMIN_ID:
-        await callback.answer("❌ Нет доступа", show_alert=True)
-        return
-    
-    text = (
-        f"<b>ТЕКУЩИЕ ЦЕНЫ</b>\n\n"
-        f"<b>Stars:</b> {PRICES['stars']}₽ за звезду\n"
-        f"<b>Premium 12 мес:</b> {PRICES['premium_12']}₽\n"
-        f"<b>Premium 6 мес:</b> {PRICES['premium_6']}₽\n"
-        f"<b>Premium 3 мес:</b> {PRICES['premium_3']}₽\n"
-        f"<b>TON наценка:</b> +{PRICES['ton_markup']}₽\n\n"
-        f" <b>Как изменить:</b>\n"
-        f"<code>stars 1.7</code> — изменить цену звезды\n"
-        f"<code>premium_12 3000</code> — изменить Premium 12 мес\n"
-        f"<code>ton_markup 25</code> — изменить наценку TON"
-    )
-    
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🔙 Назад", callback_data="admin_back")]
-    ])
-    
-    await callback.message.edit_text(text, reply_markup=keyboard, parse_mode="HTML")
-    await state.set_state("waiting_price_change")
-    await callback.answer()
-
-@router.callback_query(F.data == "admin_panel_back")
-async def admin_panel_back(callback: CallbackQuery):
+@router.callback_query(F.data == "cancel_broadcast")
+async def cancel_broadcast(callback: CallbackQuery, state: FSMContext):
     if callback.from_user.id != ADMIN_ID:
         return
 
-    text = (
-        f"<b>👑 АДМИН-ПАНЕЛЬ</b>\n\n"
-        f"👥 <b>Всего пользователей:</b> {len(user_ids)}\n"
-        f"🆔 <b>Ваш ID:</b> <code>{ADMIN_ID}</code>\n\n"
-        f"Выберите действие:"
-    )
+    await state.clear()
+    await callback.message.edit_text("Рассылка отменена")
+
+    back_keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="Назад в админку", callback_data="back_to_admin")]
+    ])
+    await callback.message.answer("Выберите действие", reply_markup=back_keyboard)
+    await callback.answer()
+
+
+@router.callback_query(F.data == "show_stats")
+async def show_stats(callback: CallbackQuery):
+    if callback.from_user.id != ADMIN_ID:
+        await callback.answer("Доступ запрещен")
+        return
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="📢 Сделать рассылку", callback_data="admin_broadcast")],
-        [InlineKeyboardButton(text="📦 Последние заказы", callback_data="admin_orders")],
-        [InlineKeyboardButton(text="📊 Статистика", callback_data="admin_stats")],
-        [InlineKeyboardButton(text="⚙️ Изменить цены", callback_data="admin_prices")],
-        [InlineKeyboardButton(text="❌ Закрыть", callback_data="menu")]
+        [InlineKeyboardButton(text="Назад", callback_data="back_to_admin")]
     ])
 
-    await callback.message.edit_text(text, reply_markup=keyboard, parse_mode="HTML")
+    await callback.message.edit_text(
+        f"СТАТИСТИКА\n\n"
+        f"Пользователей: {len(user_ids)}\n"
+        f"Заказов: {len(user_data)}",
+        reply_markup=keyboard
+    )
     await callback.answer()
+
+
+@router.callback_query(F.data == "back_to_admin")
+async def back_to_admin(callback: CallbackQuery, state: FSMContext):
+    if callback.from_user.id != ADMIN_ID:
+        return
+
+    await state.clear()
+
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="Создать рассылку", callback_data="create_broadcast")],
+        [InlineKeyboardButton(text="Статистика", callback_data="show_stats")],
+        [InlineKeyboardButton(text="Закрыть", callback_data="close_panel")]
+    ])
+
+    await callback.message.edit_text(
+        f"Админ панель\n\nПользователей: {len(user_ids)}",
+        reply_markup=keyboard
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "close_panel")
+async def close_panel(callback: CallbackQuery, state: FSMContext):
+    if callback.from_user.id != ADMIN_ID:
+        return
+
+    await state.clear()
+    await callback.message.delete()
+    await callback.answer()
+
+
+@router.message(Command("cancel"))
+async def cancel_command(message: Message, state: FSMContext):
+    if await state.get_state():
+        await state.clear()
+        await message.answer("Действие отменено")
+    else:
+        await message.answer("Нет активных действий")
+
 
 # ===== ЗАПУСК =====
 async def main():
