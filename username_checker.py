@@ -34,6 +34,7 @@ CACHE_TIME = 300  # 5 минут
 client = TelegramClient(StringSession(STRING_SESSION), API_ID, API_HASH)
 client_ready = False
 
+
 async def ensure_client():
     global client_ready
     if not client_ready:
@@ -41,6 +42,7 @@ async def ensure_client():
         client_ready = True
         print("✅ Telethon готов (по строковой сессии)")
     return client_ready
+
 
 async def check_username(username: str) -> dict:
     clean_username = username.strip().replace('@', '')
@@ -122,6 +124,7 @@ async def create_crypto_invoice(amount_rub: float, description: str = "", payloa
     except Exception as e:
         return {"success": False, "error": str(e)}
 
+
 async def check_invoice_status(invoice_id: str):
     """
     Проверяет статус счета в CryptoBot.
@@ -152,25 +155,26 @@ async def check_invoice_status(invoice_id: str):
 
 # ======= PLATEGA.IO ========
 async def create_platega_invoice(
-    amount_rub: float,
-    description: str = "Спасибо за покупку! Ждем вас снова в SpireShop",
-    order_id: str = "",
-    return_url: str = "https://t.me/spireshoptgbot"
+        amount_rub: float,
+        description: str = "Спасибо за покупку! Ждем вас снова в SpireShop",
+        order_id: str = "",
+        return_url: str = "https://t.me/spireshoptgbot"
 ):
     """
     Создаёт платёж через Platega.io (СБП)
     """
     url = "https://app.platega.io/transaction/process"
-    
+
     headers = {
         "Content-Type": "application/json",
         "X-MerchantId": "159cc4b3-df1c-4b9c-ba82-e73aaa52da33",  # 🔥 твой ID
-        "X-Secret": "ViiaxLVDICXaLOD17EsGTZlA2dR6MBA86BHjRCKVOLEjtJn9LcKDplxLr1WWsxfVmNuW7amrxGJMAXst7z7BSUf0qtNVsV9Xz8LH"  # 🔥 твой секретный ключ
+        "X-Secret": "ViiaxLVDICXaLOD17EsGTZlA2dR6MBA86BHjRCKVOLEjtJn9LcKDplxLr1WWsxfVmNuW7amrxGJMAXst7z7BSUf0qtNVsV9Xz8LH"
+        # 🔥 твой секретный ключ
     }
-    
+
     # Сумма с копейками (точка, не запятая)
     amount_str = f"{amount_rub:.2f}"
-    
+
     data = {
         "paymentMethod": 2,  # 2 = СБП
         "paymentDetails": {
@@ -182,7 +186,7 @@ async def create_platega_invoice(
         "failedUrl": return_url,
         "payload": order_id or f"order_{int(time.time())}"
     }
-    
+
     try:
         async with aiohttp.ClientSession() as session:
             async with session.post(url, json=data, headers=headers, timeout=10) as resp:
@@ -200,20 +204,21 @@ async def create_platega_invoice(
     except Exception as e:
         return {"success": False, "error": str(e)}
 
+
 async def send_gift_via_ptb(receiver_username: str, gift_id: str, text: str = ""):
     """Отправляет подарок через python-telegram-bot"""
     try:
         bot = Bot(token=BOT_TOKEN)
-        
+
         # Получаем ID пользователя по username
         from telethon import TelegramClient
         from telethon.sessions import StringSession
-        
+
         client = TelegramClient(StringSession(STRING_SESSION), API_ID, API_HASH)
         await client.connect()
         user = await client.get_entity(receiver_username)
         await client.disconnect()
-        
+
         # Отправляем подарок
         result = await bot.send_gift(
             user_id=user.id,
@@ -221,10 +226,11 @@ async def send_gift_via_ptb(receiver_username: str, gift_id: str, text: str = ""
             text=text,
             text_parse_mode=ParseMode.HTML
         )
-        
+
         return {"success": True, "result": result}
     except Exception as e:
         return {"success": False, "error": str(e)}
+
 
 # ===== ФУНКЦИЯ ДЛЯ ЗАКРЫТИЯ КЛИЕНТА =====
 async def close_client():
@@ -234,6 +240,7 @@ async def close_client():
         await client.disconnect()
         client_ready = False
         print("👋 Telethon отключен")
+
 
 # ===== ТЕСТОВЫЙ ЗАПУСК =====
 if __name__ == "__main__":
@@ -250,5 +257,6 @@ if __name__ == "__main__":
         print(f"Результат: {invoice}")
 
         await close_client()
+
 
     asyncio.run(test())
