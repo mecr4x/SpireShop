@@ -33,7 +33,7 @@ async def save_user_on_callback(callback: CallbackQuery):
     user_ids.add(callback.from_user.id)
     await asyncio.sleep(0)
 # ===== КОНФИГУРАЦИЯ =====
-BOT_TOKEN = "8236812443:AAHgQEWDwQMDAHhv8sIRxhKqmsToX9Rn85c"
+BOT_TOKEN = "8236812443:AAEhcBqFNykAb-Ajz1CIHmhxSp3WsZXMD7A"
 ADMIN_ID = 887261650
 ADMIN_CHANNEL = '@spireshop01'  # канал для подписки
 SUPPORT_USERNAME = '@adamyan_ss'
