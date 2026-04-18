@@ -325,8 +325,10 @@ async def process_steam_login(message: Message, state: FSMContext):
         f"<b>Логин:</b> <code>{steam_login}</code>\n\n"
         f"Введите сумму пополнения в рублях (от 100 до 5000):"
     )
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="Назад", callback_data="steam")
 
-    sent_message = await message.answer(text, parse_mode="HTML")
+    sent_message = await message.answer(text, reply_markup=keyboard, parse_mode="HTML")
     await save_and_delete_previous(message.from_user.id, sent_message.message_id)
     await state.set_state(Form.waiting_for_steam_amount)
 
@@ -444,7 +446,7 @@ async def process_stars_amount(message: Message, state: FSMContext):
             return
 
         # Расчет стоимости
-        formulastar = round(star_value * 1.5, 1)
+        formulastar = round(star_value * 1.6, 1)
 
         # Сохраняем данные
         save_user_data(message.from_user.id, "stars", {
