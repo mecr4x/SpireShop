@@ -326,7 +326,8 @@ async def process_steam_login(message: Message, state: FSMContext):
         f"Введите сумму пополнения в рублях (от 100 до 5000):"
     )
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="Назад", callback_data="steam")
+        [InlineKeyboardButton(text="Назад", callback_data="steam")]
+    ])
 
     sent_message = await message.answer(text, reply_markup=keyboard, parse_mode="HTML")
     await save_and_delete_previous(message.from_user.id, sent_message.message_id)
