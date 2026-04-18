@@ -239,7 +239,7 @@ async def info_callback(callback: CallbackQuery, state: FSMContext):
         [InlineKeyboardButton(text="Пользовательское соглашение",
                               url="https://telegra.ph/Polzovatelskoe-soglashenie-03-03-16",
                               icon_custom_emoji_id=6021741567163767583)],
-        [InlineKeyboardButton(text=" Назад", callback_data="back_to_menu")],
+        [InlineKeyboardButton(text=" Назад", callback_data="back_to_menu",icon_custom_emoji_id=5807899225714858124)],
     ])
     # Отправляем сообщение
     try:
@@ -270,7 +270,7 @@ async def steam_cmd(message: Message, state: FSMContext):
         "<b>Введите логин Steam (тот, что используете при входе):</b>"
     )
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="Назад", callback_data="menu")]
+        [InlineKeyboardButton(text="Назад", callback_data="menu",icon_custom_emoji_id=5807899225714858124)]
     ])
 
     try:
@@ -323,10 +323,10 @@ async def process_steam_login(message: Message, state: FSMContext):
     text = (
         f"<tg-emoji emoji-id=\"5373144051690258848\">📱</tg-emoji><b>Пополнение Steam</b>\n\n"
         f"<b>Логин:</b> <code>{steam_login}</code>\n\n"
-        f"Введите сумму пополнения в рублях (от 100 до 5000):"
+        f"Введите сумму пополнения в рублях (от 15 до 5000):"
     )
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="Назад", callback_data="steam")]
+        [InlineKeyboardButton(text="Назад", callback_data="steam", icon_custom_emoji_id=5807899225714858124)]
     ])
 
     sent_message = await message.answer(text, reply_markup=keyboard, parse_mode="HTML")
@@ -341,8 +341,8 @@ async def process_steam_amount(message: Message, state: FSMContext):
     try:
         amount = int(message.text.strip())
 
-        if amount < 100 or amount > 5000:
-            error_msg = await message.answer("❌ Сумма должна быть от 100 до 5000 рублей")
+        if amount < 15 or amount > 5000:
+            error_msg = await message.answer("❌ Сумма должна быть от 15 до 5000 рублей")
             await save_and_delete_previous(message.from_user.id, error_msg.message_id)
             await asyncio.sleep(2)
             await delete_user_message(message.from_user.id, error_msg.message_id)
@@ -417,7 +417,7 @@ async def stars_cmd(message: Message, state: FSMContext):
     )
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="Назад", callback_data="menu")]
+        [InlineKeyboardButton(text="Назад", callback_data="menu", icon_custom_emoji_id=5807899225714858124)]
     ])
 
     try:
@@ -467,7 +467,7 @@ async def process_stars_amount(message: Message, state: FSMContext):
                                   icon_custom_emoji_id=5406604187683270743)],
             [InlineKeyboardButton(text="Подарить другу", callback_data="gift_stars_friend",
                                   icon_custom_emoji_id=5203996991054432397)],
-            [InlineKeyboardButton(text="Назад", callback_data="stars")]
+            [InlineKeyboardButton(text="Назад", callback_data="stars", icon_custom_emoji_id=5807899225714858124)]
         ])
 
         try:
@@ -577,7 +577,7 @@ async def gift_stars_friend_callback(callback: CallbackQuery, state: FSMContext)
     )
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="Назад", callback_data="back_to_stars_choice")]
+        [InlineKeyboardButton(text="Назад", callback_data="back_to_stars_choice", icon_custom_emoji_id=5807899225714858124)]
     ])
 
     try:
@@ -620,7 +620,7 @@ async def back_to_stars_choice_callback(callback: CallbackQuery):
                               icon_custom_emoji_id=5305413839066525446)],
         [InlineKeyboardButton(text="Подарить другу", callback_data="gift_stars_friend",
                               icon_custom_emoji_id=5203996991054432397)],
-        [InlineKeyboardButton(text="Назад", callback_data="stars")]
+        [InlineKeyboardButton(text="Назад", callback_data="stars", icon_custom_emoji_id=5807899225714858124)]
     ])
 
     try:
@@ -724,7 +724,7 @@ async def ton_cmd(message: Message, state: FSMContext):
     )
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="Назад", callback_data="menu")]
+        [InlineKeyboardButton(text="Назад", callback_data="menu",icon_custom_emoji_id=5807899225714858124)]
     ])
 
     try:
@@ -783,7 +783,7 @@ async def process_ton_amount(message: Message, state: FSMContext):
                                   icon_custom_emoji_id=5406604187683270743)],
             [InlineKeyboardButton(text="Подарить другу", callback_data="gift_ton_friend",
                                   icon_custom_emoji_id=5203996991054432397)],
-            [InlineKeyboardButton(text="Назад", callback_data="ton")]
+            [InlineKeyboardButton(text="Назад", callback_data="ton", icon_custom_emoji_id=5807899225714858124)]
         ])
 
         try:
@@ -875,7 +875,7 @@ async def ton_friend_callback(callback: CallbackQuery, state: FSMContext):
     )
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="Назад", callback_data="buy_ton_self")]
+        [InlineKeyboardButton(text="Назад", callback_data="buy_ton_self", icon_custom_emoji_id=5807899225714858124)]
     ])
 
     try:
@@ -959,7 +959,7 @@ async def premium_cmd(message: Message):
         [InlineKeyboardButton(text="Premium - 12 месяцев", callback_data="premium_12")],
         [InlineKeyboardButton(text="Premium - 6 месяцев", callback_data="premium_6")],
         [InlineKeyboardButton(text="Premium - 3 месяца", callback_data="premium_3")],
-        [InlineKeyboardButton(text="Назад", callback_data="menu")]
+        [InlineKeyboardButton(text="Назад", callback_data="menu", icon_custom_emoji_id=5807899225714858124)]
     ])
 
     try:
@@ -985,9 +985,9 @@ async def premium_period_callback(callback: CallbackQuery, state: FSMContext):
     }
 
     prices = {
-        "premium_12": 2800,
-        "premium_6": 1500,
-        "premium_3": 1200
+        "premium_12": 2799,
+        "premium_6": 1499,
+        "premium_3": 1199
     }
 
     period = periods.get(callback.data, "3 месяца")
@@ -1010,7 +1010,7 @@ async def premium_period_callback(callback: CallbackQuery, state: FSMContext):
                               icon_custom_emoji_id=5406604187683270743)],
         [InlineKeyboardButton(text="Подарить другу", callback_data="gift_premium_friend",
                               icon_custom_emoji_id=5203996991054432397)],
-        [InlineKeyboardButton(text="Назад", callback_data="menu")]
+        [InlineKeyboardButton(text="Назад", callback_data="menu", icon_custom_emoji_id=5807899225714858124)]
     ])
 
     try:
@@ -1064,7 +1064,7 @@ async def buy_premium_self_callback(callback: CallbackQuery):
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="Подарить другу", callback_data="gift_premium_friend",
                                   icon_custom_emoji_id=5203996991054432397)],
-            [InlineKeyboardButton(text="Назад", callback_data="premium")]
+            [InlineKeyboardButton(text="Назад", callback_data="premium", icon_custom_emoji_id=5807899225714858124)]
         ])
 
         try:
@@ -1124,7 +1124,7 @@ async def gift_premium_friend_callback(callback: CallbackQuery, state: FSMContex
     )
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="Назад", callback_data="premium")]
+        [InlineKeyboardButton(text="Назад", callback_data="premium", icon_custom_emoji_id=5807899225714858124)]
     ])
 
     try:
