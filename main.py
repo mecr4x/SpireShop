@@ -1703,6 +1703,7 @@ async def get_button(message: Message, state: FSMContext):
         "stars - купить звезды\n"
         "ton - купить TON\n"
         "premium - купить Premium"
+        "steam - пополнение steam"
     )
     await state.set_state(AdminStates.waiting_for_callback)
 
