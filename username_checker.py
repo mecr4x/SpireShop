@@ -20,7 +20,7 @@ PHONE = "+79094717005"  # 🔥 ТВОЙ НОМЕР ТЕЛЕФОНА
 PASSWORD = "Serzh011"  # 🔥 ПАРОЛЬ 2FA (если есть)
 
 # ===== СТРОКА СЕССИИ (полученная из генератора) =====
-STRING_SESSION = "1ApWapzMBu0LmqnK4GI-q6aficVya2mvmkUsWQd3XmQEpdq7-iXRxu2zUsw-OYzrHxS912mJVsslwHH1Nfq8ngBQSSMwumVHLXGK52vYl1MCP7YauT4XYjaikWL_qVH7rHpyuCAo_Z6Lq9hX_uSlLWO3z8AcoBih3fuJBhhl_FvpCwkA7YnZzUczCHfI27LT53cBl662n5xHz6FAkcktuj0abaUr9rRiPFiIEgfSJzRM7QzpTjctg4uJAKau-Ts2el1fmDHCV1D2kDivlRTZsf0Cz6KUqm3Hr6hz5JiJtrXRcfElyPG6vmlZknOTg5vFgXlmIgn7C78fy0kxav1RGTZXcAzzaeb4="
+STRING_SESSION = "1ApWapzMBu3Ef4rNNZJJGQU-ffyMloNFpDmndgCFZFiEpAxj2KDxDOtqFG-DxeOINIGGsNt7ccme_ocbyIg2cTnnN3Cto_0Npl3J-J6kDI23WGJWnt3o6wUNshUwff44zapllZbbRKnUa7Y2VcTCV3JK8KibKlqRcwFKuEIovPDiM-2QGMRxDWK_ZNZQjGRb0KwhmrTq_wjRElID4bhYlOFaUbeuYv79x_yNF-Lg4PU3MXiem4D-CW1R6Ut2qpjDTtkf7KcqV-O5wxMMs3wWmSvpfjvMY_7Pdu1C8ho2k84QJhAv7mvaA8u_HOyTR_cXffq0bo6ePOc0h3RA-FLZkpqlfPiAiDVg="
 
 # ===== CRYPTOBOT НАСТРОЙКИ =====
 CRYPTO_TOKEN = "513952:AA8SvhV7y2TSGXIsQ1Sjmu1jc6CZPxDAgJZ"
