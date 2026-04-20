@@ -157,14 +157,14 @@ async def start_cmd(message: Message):
     user_ids.add(message.from_user.id)
     text = (
         "<b>Добро пожаловать!</b>\n\n"
-        "<b>Spire</b> — магазин для покупки Telegram Stars, TON и Premium "
+        "<b>Spire</b> — магазин для покупки Telegram Stars, TON, Premium, пополнения аккаунтов Steam, Playstation,Apple, Xbox "
         "дешевле, чем в приложении и без верификации.\n\n"
         "<tg-emoji emoji-id=\"5274099962655816924\">❗️</tg-emoji><b>Чтобы продолжить подпишитесь на наш канал:</b>"
     )
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="Подписаться на канал", url=f"https://t.me/{ADMIN_CHANNEL[1:]}")],
-        [InlineKeyboardButton(text="✅ Проверить Подписку", callback_data="check_sub")]
+        [InlineKeyboardButton(text="✅Проверить Подписку", callback_data="check_sub")]
     ])
 
     try:
