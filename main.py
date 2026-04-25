@@ -192,6 +192,28 @@ async def check_sub(callback: CallbackQuery):
     await menu_cmd(callback.message)
     await callback.answer()
 
+# ===== ФУНКЦИЯ ПРОВЕРКИ EMAIL ЧЕРЕЗ API =====
+async def check_email_valid(email: str) -> dict:
+    """
+    Проверяет email через внешний API
+    Возвращает: {"valid": True/False, "message": "текст"}
+    """
+    try:
+        async with aiohttp.ClientSession() as session:
+            # Бесплатный API для проверки email
+            async with session.get(f"https://emailverification.whoisxmlapi.com/api/v1?apiKey=YOUR_API_KEY&emailAddress={email}", timeout=10) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    if data.get("formatCheck") == "true" and data.get("dnsCheck") == "true":
+                        return {"valid": True, "message": "✅ Email подтвержден"}
+                    else:
+                        return {"valid": False, "message": "❌ Email не существует"}
+    except:
+        pass
+    
+    # Если API не работает, просто пропускаем проверку
+    return {"valid": True, "message": "✅ Email принят"}
+
 
 # ===== КОМАНДА /MENU =====
 @router.message(Command("menu"))
@@ -201,12 +223,13 @@ async def menu_cmd(message: Message):
         [InlineKeyboardButton(text="Пополнить TON", callback_data="ton", icon_custom_emoji_id=5438332129006081114)],
         [InlineKeyboardButton(text="Купить Premium", callback_data="premium",
                               icon_custom_emoji_id=5402352097045795954)],
-        [InlineKeyboardButton(text="Пополнить Steam", callback_data="steam",icon_custom_emoji_id=5373144051690258848)],
+        [InlineKeyboardButton(text="Пополнение аккаунтов", callback_data="game",icon_custom_emoji_id=6023852878597200124)],
         [
             InlineKeyboardButton(text="Поддержка", url=f"https://t.me/{SUPPORT_USERNAME[1:]}",
                                  icon_custom_emoji_id=6021798595739523148),
             InlineKeyboardButton(text="Информация", callback_data="info", icon_custom_emoji_id=5258503720928288433)
-        ]
+        ],
+        [InlineKeyboardButton(text="Отзывы", url=f"https://t.me/spireshop01/16", icon_custom_emoji_id=5379673286743449374]
     ])
 
     try:
@@ -251,6 +274,45 @@ async def info_callback(callback: CallbackQuery, state: FSMContext):
     await save_and_delete_previous(callback.from_user.id, sent_message.message_id)
     await callback.answer()
 
+@router.message(Command("game"))
+async def game_cmd(message: Message, state: FSMContext):
+    await state.clear()
+    user_ids.add(message.from_user.id)
+    keyboard = InlineKeyboardMarkup(inlinekeyboard=[
+        [InlineKeyboardButton(text="App Store", callback_data="appstore", icon_custom_emoji_id=5334955749409834455)],
+        [InlineKeyboardButton(text="Playstation", callback_data="playstation", icon_custom_emoji_id=5373306783706137993)],
+        [InlineKeyboardButton(text="Xbox", callback_data="xbox", icon_custom_emoji_id=5373019729566908647)],
+        [InlineKeyboardButton(text="Steam", callback_data="steam", icon_custom_emoji_id=5373144051690258848)],
+         [InlineKeyboardButton(text="Назад", callback_data="menu",icon_custom_emoji_id=5807899225714858124)]
+        
+    ])
+    text = ("<tg-emoji emoji-id=\"6023852878597200124\">🎮</tg-emoji><b>Выберите сервис для пополнения:</b>")
+    try:
+        photo = FSInputFile("images/game.jpg")
+            sent_message = await message.answer_photo(photo=photo, caption=text, reply_markup=keyboard)
+    except:
+        sent_message = await message.answer(text, reply_markup=keyboard)
+
+    await save_and_delete_previous(message.from_user.id, sent_message.message_id)
+
+@router.message(Command("appstore"))
+async def apple_cmd(message: Message, state: FSMContext):
+    await state.clear()
+    user_ids.add(message.from_user.id)
+    text = (
+        "<tg-emoji emoji-id=\"5334955749409834455\">🍏</tg-emoji><b>App Store</b>\n\n"
+        "Доступны подарочные карты App Store для регионов США и Турции.\n\n"
+        "Выберите регион карты:"
+    )
+    keyboard = InlineKeyboardMarkup(inlinekeyboard=[
+        [InlineKeyboardButton(text="Как сменить регион?", callback_data="how", icon_custom_emoji_id=5807800879553715710)],
+        [InlineKeyboardButton(text="США", callback_data="appstore_usa", icon_custom_emoji_id=5202021044105257611)],
+        [InlineKeyboardButton(text="Турция"
+        
+      
+    
+    
+
 @router.message(Command("steam"))
 async def steam_cmd(message: Message, state: FSMContext):
     await state.clear()
@@ -270,7 +332,7 @@ async def steam_cmd(message: Message, state: FSMContext):
         "<b>Введите логин Steam (тот, что используете при входе):</b>"
     )
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="Назад", callback_data="menu",icon_custom_emoji_id=5807899225714858124)]
+        [InlineKeyboardButton(text="Назад", callback_data="game",icon_custom_emoji_id=5807899225714858124)]
     ])
 
     try:
