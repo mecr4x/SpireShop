@@ -218,12 +218,19 @@ async def check_email_valid(email: str) -> dict:
 # ===== КОМАНДА /MENU =====
 @router.message(Command("menu"))
 async def menu_cmd(message: Message):
+    if not await require_subscription_callback(callback):
+        return
+    user_ids.add(message.from_user.id)
+    await state.clear()
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="Купить звёзды", callback_data="stars", icon_custom_emoji_id=5438391541288689158)],
         [InlineKeyboardButton(text="Пополнить TON", callback_data="ton", icon_custom_emoji_id=5438332129006081114)],
         [InlineKeyboardButton(text="Купить Premium", callback_data="premium",
                               icon_custom_emoji_id=5402352097045795954)],
-        [InlineKeyboardButton(text="Пополнение аккаунтов", callback_data="game",icon_custom_emoji_id=6023852878597200124)],
+        [
+            InlineKeyboardButton(text="Пополнение Steam", callback_data="steam",icon_custom_emoji_id=5373144051690258848),
+            InlineKeyboardButton(text="Пополнение PlayStation", callback_data="playstation", icon_custom_emoji_id=5373306783706137993)
+        ],
         [
             InlineKeyboardButton(text="Поддержка", url=f"https://t.me/{SUPPORT_USERNAME[1:]}",
                                  icon_custom_emoji_id=6021798595739523148),
@@ -244,10 +251,8 @@ async def menu_cmd(message: Message):
 # ===== ОБРАБОТЧИК КНОПКИ "ИНФОРМАЦИЯ" =====
 @router.callback_query(F.data == "info")
 async def info_callback(callback: CallbackQuery, state: FSMContext):
-    # 👇 ПРОВЕРКА ПОДПИСКИ
     if not await require_subscription_callback(callback):
         return
-
     await state.clear()
 
     text = (
@@ -274,44 +279,241 @@ async def info_callback(callback: CallbackQuery, state: FSMContext):
     await save_and_delete_previous(callback.from_user.id, sent_message.message_id)
     await callback.answer()
 
-@router.message(Command("game"))
-async def game_cmd(message: Message, state: FSMContext):
+@router.message(Command("playstation"))
+async def playstation_cmd(message: Message, state: FSMContext):
+    if not await require_subscription_callback(callback):
+        return
     await state.clear()
     user_ids.add(message.from_user.id)
-    keyboard = InlineKeyboardMarkup(inlinekeyboard=[
-        [InlineKeyboardButton(text="App Store", callback_data="appstore", icon_custom_emoji_id=5334955749409834455)],
-        [InlineKeyboardButton(text="Playstation", callback_data="playstation", icon_custom_emoji_id=5373306783706137993)],
-        [InlineKeyboardButton(text="Xbox", callback_data="xbox", icon_custom_emoji_id=5373019729566908647)],
-        [InlineKeyboardButton(text="Steam", callback_data="steam", icon_custom_emoji_id=5373144051690258848)],
-         [InlineKeyboardButton(text="Назад", callback_data="menu",icon_custom_emoji_id=5807899225714858124)]
-        
+    text = (
+        "<tg-emoji emoji-id=\"5373306783706137993\">📱</tg-emoji><b>Пополнение PlayStation</b>\n\n
+        "<tg-emoji emoji-id=\"5447644880824181073\">⚠️</tg-emoji><b>Примечание: обязательно прочтите перед пополнением</b>\n"
+        "<blockquote>"
+        "<tg-emoji emoji-id=\"5274099962655816924\">❗️</tg-emoji><b>Пополнение аккаунта Playstation - в формате Gift Card.</b>\n\n"
+        "<tg-emoji emoji-id=\"5436113877181941026\">❓</tg-emoji><b>Как это работает?</b>\n\n"
+        "1.Вы покупаете gift card на определенную сумму (например 25$, 50$, 100$ и т.д.)\n"
+        "2.Получаете код на email (обычно в течение 20 минут после оплаты)\n"
+        "3.Активируете код в PlayStation Store (инструкция по применению также есть в письме)\n"
+        "4.Деньги поступают на ваш PSN кошелек"
+        "</blockquote>\n"
+        "Доступны подарочные карты PlayStation для регионов США, Турции и Польши.\n\n"
+        "Выберите регион карты:"
+    )
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="США", callback_data="playstation_usa", icon_custom_emoji_id=5202021044105257611)],
+        [InlineKeyboardButton(text="Турция",callback_data="playstation_turkey", icon_custom_emoji_id=5235921989771736755)],
+        [InlineKeyboardButton(text="Польша", callback_data="playstation_polsha", icon_custom_emoji_id=5291847690940852675)],
+        [InlineKeyboardButton(text="Назад", callback_data="menu",icon_custom_emoji_id=5807899225714858124)]
     ])
-    text = ("<tg-emoji emoji-id=\"6023852878597200124\">🎮</tg-emoji><b>Выберите сервис для пополнения:</b>")
     try:
         photo = FSInputFile("images/game.jpg")
-            sent_message = await message.answer_photo(photo=photo, caption=text, reply_markup=keyboard)
+        sent_message = await message.answer_photo(photo=photo, caption=text, reply_markup=keyboard)
     except:
         sent_message = await message.answer(text, reply_markup=keyboard)
 
     await save_and_delete_previous(message.from_user.id, sent_message.message_id)
 
-@router.message(Command("appstore"))
-async def apple_cmd(message: Message, state: FSMContext):
-    await state.clear()
-    user_ids.add(message.from_user.id)
+# ===== ВЫБОР РЕГИОНА =====
+@router.callback_query(F.data.startswith("playstation_"))
+async def playstation_region_handler(callback: CallbackQuery, state: FSMContext):
+    if not await require_subscription_callback(callback):
+        return
+    region = callback.data.replace("playstation_", "")
+    
+    await state.update_data(region=region)
+    
+    # Номиналы и их стоимость в рублях
+    amounts = {
+        "usa": [
+            {"value": 25, "price": 2199},
+            {"value": 50, "price": 4099},
+            {"value": 75, "price": 5},
+            {"value": 100, "price": 7700}
+        ],
+        "turkey": [
+            {"value": 500, "price": 350},
+            {"value": 1000, "price": 650},
+            {"value": 1500, "price": 950},
+            {"value": 2000, "price": 1550},
+            {"value": 2500, "price": 3000},
+            {"value": 3000, "price": 9509}
+        ],
+        "poland": [
+            {"value": 50, "price": 1599},
+            {"value": 100, "price": 2800},
+            {"value": 200, "price": 5400}
+        ]
+    }
+    
+    currency = {
+        "usa": "$",
+        "turkey": "TRY",
+        "poland": "PLN"
+    }
+    
+    region_name = {
+        "usa": "<tg-emoji emoji-id=\"5202021044105257611\">🇺🇸</tg-emoji>США",
+        "turkey": "<tg-emoji emoji-id=\"5235921989771736755\">🇹🇷</tg-emoji>Турция",
+        "poland": "<tg-emoji emoji-id=\"5291847690940852675\">🇵🇱</tg-emoji>Польша"
+    }
+    
+    selected_amounts = amounts.get(region, [])
+    selected_currency = currency.get(region, "₽")
+    selected_region = region_name.get(region, region.upper())
+    
     text = (
-        "<tg-emoji emoji-id=\"5334955749409834455\">🍏</tg-emoji><b>App Store</b>\n\n"
-        "Доступны подарочные карты App Store для регионов США и Турции.\n\n"
-        "Выберите регион карты:"
+        f"<tg-emoji emoji-id=\"5373306783706137993\">📱</tg-emoji><b>Пополнение PlayStation</b>\n\n"
+        f"<tg-emoji emoji-id=\"6021443182900812386\">🌎</tg-emoji><b>Регион:</b> {selected_region}\n\n"
+        f"Выберите номинал карты:"
     )
-    keyboard = InlineKeyboardMarkup(inlinekeyboard=[
-        [InlineKeyboardButton(text="Как сменить регион?", callback_data="how", icon_custom_emoji_id=5807800879553715710)],
-        [InlineKeyboardButton(text="США", callback_data="appstore_usa", icon_custom_emoji_id=5202021044105257611)],
-        [InlineKeyboardButton(text="Турция"
+    
+    # Создаем кнопки с суммами (номинал + цена в рублях)
+    buttons = []
+    row = []
+    
+    # Для США - 2 кнопки в ряду, для остальных - 3
+    cols = 2 if region == "usa" else 3
+    
+    for i, item in enumerate(selected_amounts):
+        button_text = f"{item['value']} {selected_currency} | {item['price']}₽"
+        row.append(InlineKeyboardButton(text=button_text, callback_data=f"ps_amount_{region}_{item['value']}_{item['price']}"))
         
-      
+        if len(row) == cols or i == len(selected_amounts) - 1:
+            buttons.append(row)
+            row = []
+    
+    buttons.append([InlineKeyboardButton(text="Назад", callback_data="playstation", icon_custom_emoji_id=5807899225714858124)])
+    
+    keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
+    
+    await callback.message.edit_text(text, reply_markup=keyboard, parse_mode="HTML")
+    await callback.answer()
+
+
+# ===== ФУНКЦИЯ ПРОВЕРКИ EMAIL ЧЕРЕЗ API =====
+async def check_email_api(email: str) -> dict:
+    """Проверяет email через бесплатное API"""
+    url = f"https://rapid-email-verifier.fly.dev/api/validate?email={email}"
+    
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, timeout=10) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    is_valid = data.get("status") == "valid"
+                    return {
+                        "valid": is_valid,
+                        "message": "✅ Email подтвержден" if is_valid else "❌ Email не существует"
+                    }
+                else:
+                    return {"valid": True, "message": "✅ Проверка пропущена"}
+    except Exception as e:
+        print(f"Ошибка проверки email: {e}")
+        return {"valid": True, "message": "✅ Проверка пропущена"}
+
+
+# ===== ВЫБОР НОМИНАЛА =====
+@router.callback_query(F.data.startswith("ps_amount_"))
+async def ps_amount_handler(callback: CallbackQuery, state: FSMContext):
+    if not await require_subscription_callback(callback):
+        return
+    
+    # ps_amount_usa_50_3900
+    parts = callback.data.split("_")
+    region = parts[2]
+    amount = parts[3]
+    price = parts[4] if len(parts) > 4 else amount
+    
+    await state.update_data(region=region, amount=amount, price=price)
+    
+    text = (
+        f"<tg-emoji emoji-id=\"5373306783706137993\">📱</tg-emoji><b>Пополнение PlayStation</b>\n\n"
+        f"<tg-emoji emoji-id=\"6021443182900812386\">🌎</tg-emoji><b>Регион:</b> {selected_region}\n"
+        "<tg-emoji emoji-id=\"5447644880824181073\">⚠️</tg-emoji><b>Примечание:</b>\n"
+        "<blockquote>"
+        "Убедитесь, что ваш почтовый ящик принимает входящие сообщения и письмо не попало в спам."
+        "</blockquote>\n\n"
+        f"Введите ваш email для получения кода:"
+    )
+    
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="Назад", callback_data=f"playstation_{region}", icon_custom_emoji_id=5807899225714858124)]
+    ])
+    
+    await callback.message.edit_text(text, reply_markup=keyboard, parse_mode="HTML")
+    await state.set_state("waiting_for_ps_email")
+    await callback.answer()
+
+
+# ===== ОБРАБОТЧИК EMAIL С ПРОВЕРКОЙ =====
+@router.message(StateFilter("waiting_for_ps_email"))
+async def ps_email_handler(message: Message, state: FSMContext):
+    await delete_user_message(message.from_user.id, message.message_id)
+    
+    email = message.text.strip()
+    
+    # Простая проверка формата
+    if "@" not in email or "." not in email:
+        error_msg = await message.answer("❌ Введите корректный email (пример: name@mail.ru)")
+        await save_and_delete_previous(message.from_user.id, error_msg.message_id)
+        await asyncio.sleep(2)
+        await delete_user_message(message.from_user.id, error_msg.message_id)
+        return
+    
+    # Проверка через API
+    status_msg = await message.answer("🔍 Проверяю email...")
+    result = await check_email_api(email)
+    await delete_user_message(message.from_user.id, status_msg.message_id)
+    
+    if not result["valid"]:
+        error_msg = await message.answer(f"{result['message']}\n\nПопробуйте другой email:")
+        await save_and_delete_previous(message.from_user.id, error_msg.message_id)
+        await asyncio.sleep(3)
+        await delete_user_message(message.from_user.id, error_msg.message_id)
+        return
+    
+    # Email прошел проверку
+    data = await state.get_data()
+    region = data.get("region")
+    amount = data.get("amount")
+    price = data.get("price")
+    
+    # Сохраняем данные заказа
+    save_user_data(message.from_user.id, "ps_payment", {
+        "region": region,
+        "amount": amount,
+        "price": price,
+        "email": email
+    })
     
     
+    text = (
+        f"<tg-emoji emoji-id=\"5373306783706137993\">📱</tg-emoji><b>Пополнение PlayStation</b>\n\n"
+        f"<b>Регион:</b> {region}\n"
+        f"<b>Сумма пополнения:</b> {amount}\n"
+        f"<b>Сумма к оплате:</b> {price}\n"
+        f"<b>Email:</b> <code>{email}</code>\n\n"
+        f"Выберите способ оплаты:"
+    )
+    
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="СБП", callback_data=f"sbp_ps_{region}_{amount}_{email}", icon_custom_emoji_id=5305413839066525446)],
+        [InlineKeyboardButton(text="CryptoBot",
+        [InlineKeyboardButton(text="❌Отмена", callback_data="playstation")]
+    ])
+    
+    sent_msg = await message.answer(text, reply_markup=keyboard, parse_mode="HTML")
+    await save_and_delete_previous(message.from_user.id, sent_msg.message_id)
+    await state.clear()
+
+
+# ===== ОБРАБОТЧИК НАЗАД =====
+@router.callback_query(F.data == "playstation")
+async def back_to_playstation(callback: CallbackQuery, state: FSMContext):
+    if not await require_subscription_callback(callback):
+        return
+    await playstation_cmd(callback.message, state)
+    await callback.answer()
 
 @router.message(Command("steam"))
 async def steam_cmd(message: Message, state: FSMContext):
@@ -332,7 +534,7 @@ async def steam_cmd(message: Message, state: FSMContext):
         "<b>Введите логин Steam (тот, что используете при входе):</b>"
     )
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="Назад", callback_data="game",icon_custom_emoji_id=5807899225714858124)]
+        [InlineKeyboardButton(text="Назад", callback_data="menu",icon_custom_emoji_id=5807899225714858124)]
     ])
 
     try:
@@ -350,8 +552,6 @@ async def process_steam_login(message: Message, state: FSMContext):
     await delete_user_message(message.from_user.id, message.message_id)
 
     steam_login = message.text.strip()
-
-    # Простая проверка на пустоту
     if not steam_login:
         error_msg = await message.answer("❌ Пожалуйста, введите логин Steam")
         await save_and_delete_previous(message.from_user.id, error_msg.message_id)
@@ -359,7 +559,6 @@ async def process_steam_login(message: Message, state: FSMContext):
         await delete_user_message(message.from_user.id, error_msg.message_id)
         return
 
-    # Проверка через парсинг
     check_msg = await message.answer("🔍 Проверяю логин в Steam...")
 
     login_exists = await check_steam_login_exists(steam_login)
@@ -1036,7 +1235,6 @@ async def premium_cmd(message: Message):
 # ===== КНОПКИ PREMIUM =====
 @router.callback_query(F.data.startswith("premium_"))
 async def premium_period_callback(callback: CallbackQuery, state: FSMContext):
-    # 👇 ПРОВЕРКА ПОДПИСКИ
     if not await require_subscription_callback(callback):
         return
 
@@ -1087,7 +1285,6 @@ async def premium_period_callback(callback: CallbackQuery, state: FSMContext):
 # ===== КНОПКА "КУПИТЬ PREMIUM СЕБЕ" =====
 @router.callback_query(F.data == "buy_premium_self")
 async def buy_premium_self_callback(callback: CallbackQuery):
-    # 👇 ПРОВЕРКА ПОДПИСКИ
     if not await require_subscription_callback(callback):
         return
 
@@ -1164,7 +1361,6 @@ async def buy_premium_self_callback(callback: CallbackQuery):
 # ===== КНОПКА "ПОДАРИТЬ PREMIUM ДРУГУ" =====
 @router.callback_query(F.data == "gift_premium_friend")
 async def gift_premium_friend_callback(callback: CallbackQuery, state: FSMContext):
-    # 👇 ПРОВЕРКА ПОДПИСКИ
     if not await require_subscription_callback(callback):
         return
 
@@ -1295,7 +1491,6 @@ async def process_premium_friend(message: Message, state: FSMContext):
 # ===== ОБРАБОТКА КНОПОК МЕНЮ =====
 @router.callback_query(F.data == "menu")
 async def menu_btn(callback: CallbackQuery):
-    # 👇 ПРОВЕРКА ПОДПИСКИ
     if not await require_subscription_callback(callback):
         return
     await menu_cmd(callback.message)
@@ -1310,7 +1505,6 @@ async def steam_btn(callback: CallbackQuery, state: FSMContext):
 
 @router.callback_query(F.data == "stars")
 async def stars_btn(callback: CallbackQuery, state: FSMContext):
-    # 👇 ПРОВЕРКА ПОДПИСКИ
     if not await require_subscription_callback(callback):
         return
     await stars_cmd(callback.message, state)
@@ -1319,7 +1513,6 @@ async def stars_btn(callback: CallbackQuery, state: FSMContext):
 
 @router.callback_query(F.data == "ton")
 async def ton_btn(callback: CallbackQuery, state: FSMContext):
-    # 👇 ПРОВЕРКА ПОДПИСКИ
     if not await require_subscription_callback(callback):
         return
     await ton_cmd(callback.message, state)
@@ -1328,16 +1521,16 @@ async def ton_btn(callback: CallbackQuery, state: FSMContext):
 
 @router.callback_query(F.data == "premium")
 async def premium_btn(callback: CallbackQuery):
-    # 👇 ПРОВЕРКА ПОДПИСКИ
     if not await require_subscription_callback(callback):
         return
     await premium_cmd(callback.message)
     await callback.answer()
 
 
+
+
 @router.callback_query(F.data.startswith("crypto_"))
 async def crypto_payment(callback: CallbackQuery):
-    # 👇 ПРОВЕРКА ПОДПИСКИ
     if not await require_subscription_callback(callback):
         return
 
@@ -1348,11 +1541,9 @@ async def crypto_payment(callback: CallbackQuery):
         await callback.answer("❌ Ошибка", show_alert=True)
         return
 
-    # ✅ ЭТО УЖЕ ЕСТЬ
     ptype = parts[1]  # stars, premium, ton
     amount = float(parts[2])
 
-    # 👇 А ЭТО НУЖНО ДОБАВИТЬ
     stars_data = get_user_data(user_id, "stars")
     premium_data = get_user_data(user_id, "premium")
     ton_data = get_user_data(user_id, "ton_purchase")
@@ -1376,6 +1567,8 @@ async def crypto_payment(callback: CallbackQuery):
         description = f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> {ton_value} TON"
         base_price = round(ton_value * TON_RUB, 1)
         commission = round(amount - base_price, 1)
+
+    
 
     payload = f"{ptype}_{user_id}_{int(time.time())}"
 
@@ -1512,6 +1705,7 @@ async def sbp_payment(callback: CallbackQuery):
     premium_data = get_user_data(user_id, "premium")
     ton_data = get_user_data(user_id, "ton_purchase")
     steam_data = get_user_data(user_id, "steam")
+    playstation_data= get_user_data(user_id, "playstation")
 
     # 👇 ПОЛУЧАЕМ USERNAME
     username = callback.from_user.username
