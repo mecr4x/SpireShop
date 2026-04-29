@@ -286,7 +286,7 @@ async def playstation_cmd(message: Message, state: FSMContext):
     await state.clear()
     user_ids.add(message.from_user.id)
     text = (
-        "<tg-emoji emoji-id=\"5373306783706137993\">📱</tg-emoji><b>Пополнение PlayStation</b>\n\n
+        "<tg-emoji emoji-id=\"5373306783706137993\">📱</tg-emoji><b>Пополнение PlayStation</b>\n\n"
         "<tg-emoji emoji-id=\"5447644880824181073\">⚠️</tg-emoji><b>Примечание: обязательно прочтите перед пополнением</b>\n"
         "<blockquote>"
         "<tg-emoji emoji-id=\"5274099962655816924\">❗️</tg-emoji><b>Пополнение аккаунта Playstation - в формате Gift Card.</b>\n\n"
