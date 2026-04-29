@@ -235,7 +235,7 @@ async def menu_cmd(message: Message, state: FSMContext):
                                  icon_custom_emoji_id=6021798595739523148),
             InlineKeyboardButton(text="Информация", callback_data="info", icon_custom_emoji_id=5258503720928288433)
         ],
-        [InlineKeyboardButton(text="Отзывы", url=f"https://t.me/spireshop01/16", icon_custom_emoji_id=5379673286743449374)]
+        [InlineKeyboardButton(text="Отзывы", url=f"https://t.me/spireshop01/16", icon_custom_emoji_id=5379673286743449374)],
     ])
 
     try:
