@@ -637,7 +637,7 @@ async def process_steam_amount(message: Message, state: FSMContext):
             f"<tg-emoji emoji-id=\"5373144051690258848\">📱</tg-emoji><b>Пополнение Steam</b>\n\n"
             f"<b>Логин:</b> <code>{steam_login}</code>\n"
             f"<b>Сумма пополнения:</b> {amount}₽\n"
-            f"<b>Сумма к оплате: {amount*1.05}₽</b>\n"
+            f"<b>Сумма к оплате: {round(amount*1.05, 1)}₽</b>\n"
             f"<tg-emoji emoji-id=\"5447644880824181073\">⚠️</tg-emoji><b>Примечание:</b>\n"
             f"<blockquote>"
             f"Из-за двойной конвертации (из рублей в доллары, из долларов в валюту аккаунта) до 10% от суммы платежа уйдёт на обмен валют.</blockquote>\n\n"
@@ -645,7 +645,7 @@ async def process_steam_amount(message: Message, state: FSMContext):
         )
 
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="СБП", callback_data=f"sbp_steam_self_{amount}", icon_custom_emoji_id=5305413839066525446)],
+            [InlineKeyboardButton(text="СБП", callback_data=f"sbp_steam_self_{rounf(amount * 1.05 ,1)}", icon_custom_emoji_id=5305413839066525446)],
             [InlineKeyboardButton(text="CryptoBot", callback_data=f"crypto_steam_{round(amount / 0.97, 1)}", icon_custom_emoji_id=5361914370068613491)],
             [InlineKeyboardButton(text="❌Отмена", callback_data="menu")]
         ])
