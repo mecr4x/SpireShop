@@ -118,9 +118,10 @@ class Form(StatesGroup):
 class AdminStates(StatesGroup):
     waiting_for_photo = State()
     waiting_for_text = State()
-    waiting_for_button = State()
+    waiting_for_button_text = State()
+    waiting_for_button_color = State()
+    waiting_for_button_emoji = State()
     waiting_for_callback = State()
-
 
 
 # ===== ХРАНИЛИЩЕ ДАННЫХ =====
@@ -157,7 +158,7 @@ async def start_cmd(message: Message):
     user_ids.add(message.from_user.id)
     text = (
         "<b>Добро пожаловать!</b>\n\n"
-        "<b>Spire</b> — магазин для покупки Telegram Stars, TON, Premium, пополнения аккаунтов Steam, Playstation,Apple, Xbox "
+        "<b>Spire</b> — магазин для покупки Telegram Stars, TON, Premium, пополнения аккаунтов Steam и Playstation, "
         "дешевле, чем в приложении и без верификации.\n\n"
         "<tg-emoji emoji-id=\"5274099962655816924\">❗️</tg-emoji><b>Чтобы продолжить подпишитесь на наш канал:</b>"
     )
@@ -327,21 +328,21 @@ async def playstation_region_handler(callback: CallbackQuery, state: FSMContext)
         "usa": [
             {"value": 25, "price": 2199},
             {"value": 50, "price": 4099},
-            {"value": 75, "price": 5},
-            {"value": 100, "price": 7700}
+            {"value": 75, "price": 5899},
+            {"value": 100, "price": 7699}
         ],
         "turkey": [
-            {"value": 500, "price": 350},
-            {"value": 1000, "price": 650},
-            {"value": 1500, "price": 950},
-            {"value": 2000, "price": 1550},
-            {"value": 2500, "price": 3000},
-            {"value": 3000, "price": 9509}
+            {"value": 500, "price": 1099},
+            {"value": 1000, "price": 2099},
+            {"value": 1500, "price": 3199},
+            {"value": 2000, "price": 4199},
+            {"value": 2500, "price": 5299},
+            {"value": 3000, "price": 6199}
         ],
         "poland": [
             {"value": 50, "price": 1599},
-            {"value": 100, "price": 2800},
-            {"value": 200, "price": 5400}
+            {"value": 100, "price": 2799},
+            {"value": 200, "price": 5399}
         ]
     }
     
@@ -498,7 +499,7 @@ async def ps_email_handler(message: Message, state: FSMContext):
     
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="СБП", callback_data=f"sbp_ps_{region}_{amount}_{email}", icon_custom_emoji_id=5305413839066525446)],
-        [InlineKeyboardButton(text="CryptoBot",
+        [InlineKeyboardButton(text="CryptoBot", callback_data=f"crypto_playstation_{round(price / 0.97,1)}", icon_custom_emoji_id=5361914370068613491)],
         [InlineKeyboardButton(text="❌Отмена", callback_data="playstation")]
     ])
     
@@ -708,7 +709,7 @@ async def process_stars_amount(message: Message, state: FSMContext):
             return
 
         # Расчет стоимости
-        formulastar = round(star_value * 1.6, 1)
+        formulastar = round(star_value * 1.45, 1)
 
         # Сохраняем данные
         save_user_data(message.from_user.id, "stars", {
@@ -1025,7 +1026,7 @@ async def process_ton_amount(message: Message, state: FSMContext):
             await delete_user_message(message.from_user.id, error_msg.message_id)
             return
 
-        formulaTON = round(ton_value * (TON_RUB + 20), 1)
+        formulaTON = round(ton_value * (TON_RUB + 25), 1)
 
         save_user_data(user_id, "ton_purchase", {
             'ton_value': ton_value,
@@ -1526,6 +1527,13 @@ async def premium_btn(callback: CallbackQuery):
     await premium_cmd(callback.message)
     await callback.answer()
 
+@router.callback_query(F.data == "playstation")
+async def playstation_btn(callback: CallbackQuery):
+    if not await require_subscription_callback(callback):
+        return
+    await premium_cmd(callback.message)
+    await callback.answer()
+
 
 
 
@@ -1755,6 +1763,19 @@ async def sbp_payment(callback: CallbackQuery):
         base_price = float(steam_amount * 1.05)
         final_amount = round(base_price / 0.92, 1)
 
+    elif ptype == "ps" and ps_data:
+    region = ps_data.get('region', '?')
+    amount_value = ps_data.get('amount', '?')
+    price = ps_data.get('price', amount)
+    email = ps_data.get('email', '?')
+    description = (f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> Пополнение PlayStation\n"
+                   f"<tg-emoji emoji-id=\"6021443182900812386\">🌎</tg-emoji><b>Регион:</b> {region}\n"
+                   f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Номинал:</b> {amount_value}\n"
+                   f"<tg-emoji emoji-id=\"5255975823436973213\">🎁</tg-emoji><b>Email:</b> <code>{email}</code>")
+    base_price = float(price)
+    final_amount = round(base_price / 0.92, 1)
+        
+
     else:
         await callback.answer("❌ Ошибка: данные не найдены", show_alert=True)
         return
@@ -1867,7 +1888,17 @@ async def paid_callback(callback: CallbackQuery):
         await callback.answer("❌ Ошибка данных", show_alert=True)
 
 
-# ===== АДМИН-ПАНЕЛЬ (РАБОЧАЯ) =====
+# ===== ЦВЕТА ДЛЯ КНОПОК =====
+BUTTON_COLORS = {
+    "blue": {"name": "Синий", "color": "primary"},
+    "green": {"name": "Зеленый", "color": "success"},
+    "red": {"name": "Красный", "color": "danger"},
+    "yellow": {"name": "Желтый", "color": "warning"},
+    "white": {"name": "Белый", "color": "secondary"}
+}
+
+
+# ===== ГЛАВНАЯ АДМИН-ПАНЕЛЬ =====
 @router.message(Command("admin"))
 async def admin_panel(message: Message, state: FSMContext):
     if message.from_user.id != ADMIN_ID:
@@ -1936,11 +1967,11 @@ async def get_text(message: Message, state: FSMContext):
     await message.answer(
         "ШАГ 3: ВВЕДИТЕ ТЕКСТ КНОПКИ\n\nПример: Главное меню"
     )
-    await state.set_state(AdminStates.waiting_for_button)
+    await state.set_state(AdminStates.waiting_for_button_text)
 
 
-@router.message(AdminStates.waiting_for_button)
-async def get_button(message: Message, state: FSMContext):
+@router.message(AdminStates.waiting_for_button_text)
+async def get_button_text(message: Message, state: FSMContext):
     if message.from_user.id != ADMIN_ID:
         await state.clear()
         return
@@ -1952,14 +1983,70 @@ async def get_button(message: Message, state: FSMContext):
 
     await state.update_data(button_text=button_text)
 
+    # Выбор цвета кнопки
+    color_keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🔵 Синий", callback_data="color_blue")],
+        [InlineKeyboardButton(text="🟢 Зеленый", callback_data="color_green")],
+        [InlineKeyboardButton(text="🔴 Красный", callback_data="color_red")],
+        [InlineKeyboardButton(text="🟡 Желтый", callback_data="color_yellow")],
+        [InlineKeyboardButton(text="⚪ Белый", callback_data="color_white")]
+    ])
+
     await message.answer(
-        "ШАГ 4: ВВЕДИТЕ CALLBACK_DATA\n\n"
+        "ШАГ 4: ВЫБЕРИТЕ ЦВЕТ КНОПКИ",
+        reply_markup=color_keyboard
+    )
+    await state.set_state(AdminStates.waiting_for_button_color)
+
+
+@router.callback_query(F.data.startswith("color_"))
+async def get_button_color(callback: CallbackQuery, state: FSMContext):
+    if callback.from_user.id != ADMIN_ID:
+        return
+
+    color = callback.data.replace("color_", "")
+    await state.update_data(button_color=color)
+
+    # Запрос emoji
+    await callback.message.edit_text(
+        "ШАГ 5: ВВЕДИТЕ ICON_CUSTOM_EMOJI_ID\n\n"
+        "Отправьте числовой ID эмодзи\n"
+        "Пример: 5406604187683270743\n\n"
+        "Если не нужна иконка, отправьте 0"
+    )
+    await state.set_state(AdminStates.waiting_for_button_emoji)
+    await callback.answer()
+
+
+@router.message(AdminStates.waiting_for_button_emoji)
+async def get_button_emoji(message: Message, state: FSMContext):
+    if message.from_user.id != ADMIN_ID:
+        await state.clear()
+        return
+
+    emoji_id = message.text.strip()
+
+    if emoji_id == "0":
+        emoji_id = None
+    else:
+        # Проверяем что это число
+        try:
+            emoji_id = int(emoji_id)
+        except ValueError:
+            await message.answer("❌ Введите корректный ID (число) или 0")
+            return
+
+    await state.update_data(button_emoji=emoji_id)
+
+    await message.answer(
+        "ШАГ 6: ВВЕДИТЕ CALLBACK_DATA\n\n"
         "Варианты:\n"
         "menu - главное меню\n"
         "stars - купить звезды\n"
         "ton - купить TON\n"
-        "premium - купить Premium"
-        "steam - пополнение steam"
+        "premium - купить Premium\n"
+        "steam - пополнение steam\n"
+        "playstation - пополнение playstation"
     )
     await state.set_state(AdminStates.waiting_for_callback)
 
@@ -1977,10 +2064,22 @@ async def get_callback(message: Message, state: FSMContext):
     broadcast_text = data.get("broadcast_text")
     button_text = data.get("button_text")
     photo_id = data.get("photo_id")
+    button_color = data.get("button_color", "blue")
+    button_emoji = data.get("button_emoji")
 
-    # Создаем клавиатуру
+    # Создаем кнопку с цветом и иконкой
+    button_kwargs = {"text": button_text, "callback_data": callback_data}
+    
+    # Добавляем цвет если не белый
+    if button_color != "white":
+        button_kwargs["color"] = button_color
+    
+    # Добавляем emoji если есть
+    if button_emoji:
+        button_kwargs["icon_custom_emoji_id"] = button_emoji
+    
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text=button_text, callback_data=callback_data)]
+        [InlineKeyboardButton(**button_kwargs)]
     ])
 
     # Предпросмотр
@@ -2011,7 +2110,10 @@ async def get_callback(message: Message, state: FSMContext):
     ])
 
     await message.answer(
-        f"ПОЛУЧАТЕЛЕЙ: {len(user_ids)}\n\nОтправить?",
+        f"ПОЛУЧАТЕЛЕЙ: {len(user_ids)}\n\n"
+        f"Цвет кнопки: {BUTTON_COLORS.get(button_color, {}).get('name', button_color)}\n"
+        f"Иконка: {'✅' if button_emoji else '❌'}\n\n"
+        f"Отправить?",
         reply_markup=confirm_keyboard
     )
 
