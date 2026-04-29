@@ -218,11 +218,9 @@ async def check_email_valid(email: str) -> dict:
 
 # ===== КОМАНДА /MENU =====
 @router.message(Command("menu"))
-async def menu_cmd(message: Message):
-    if not await require_subscription_callback(callback):
-        return
-    user_ids.add(message.from_user.id)
+async def menu_cmd(message: Message, state: FSMContext):
     await state.clear()
+    user_ids.add(message.from_user.id)
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="Купить звёзды", callback_data="stars", icon_custom_emoji_id=5438391541288689158)],
         [InlineKeyboardButton(text="Пополнить TON", callback_data="ton", icon_custom_emoji_id=5438332129006081114)],
@@ -282,7 +280,8 @@ async def info_callback(callback: CallbackQuery, state: FSMContext):
 
 @router.message(Command("playstation"))
 async def playstation_cmd(message: Message, state: FSMContext):
-    if not await require_subscription_callback(callback):
+    if not await check_subscription(message.from_user.id):
+        await message.answer("❌ Сначала подпишитесь на канал @spireshop01")
         return
     await state.clear()
     user_ids.add(message.from_user.id)
@@ -1528,10 +1527,10 @@ async def premium_btn(callback: CallbackQuery):
     await callback.answer()
 
 @router.callback_query(F.data == "playstation")
-async def playstation_btn(callback: CallbackQuery):
+async def playstation_btn(callback: CallbackQuery, state: FSMContext):
     if not await require_subscription_callback(callback):
         return
-    await premium_cmd(callback.message)
+    await playstation_cmd(callback.message, state)
     await callback.answer()
 
 
@@ -1549,12 +1548,14 @@ async def crypto_payment(callback: CallbackQuery):
         await callback.answer("❌ Ошибка", show_alert=True)
         return
 
-    ptype = parts[1]  # stars, premium, ton
+    ptype = parts[1]  # stars, premium, ton, steam, playstation
     amount = float(parts[2])
 
     stars_data = get_user_data(user_id, "stars")
     premium_data = get_user_data(user_id, "premium")
     ton_data = get_user_data(user_id, "ton_purchase")
+    steam_data = get_user_data(user_id, "steam")
+    ps_data = get_user_data(user_id, "ps_payment")
 
     # Дальше определяем описание и комиссию
     if ptype == "stars" and stars_data:
@@ -1576,7 +1577,29 @@ async def crypto_payment(callback: CallbackQuery):
         base_price = round(ton_value * TON_RUB, 1)
         commission = round(amount - base_price, 1)
 
-    
+    elif ptype == "steam" and steam_data:
+        steam_amount = steam_data.get('steam_amount', '?')
+        steam_login = steam_data.get('steam_login', '?')
+        description = (f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> Пополнение Steam на {steam_amount}₽\n"
+                       f"<tg-emoji emoji-id=\"5255975823436973213\">🎁</tg-emoji><b>Логин:</b> <code>{steam_login}</code>")
+        base_price = float(steam_amount)
+        commission = round(amount - base_price, 1)
+
+    elif ptype == "playstation" and ps_data:
+        region = ps_data.get('region', '?')
+        amount_value = ps_data.get('amount', '?')
+        price = ps_data.get('price', amount)
+        email = ps_data.get('email', '?')
+        description = (f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> Пополнение PlayStation\n"
+                       f"<tg-emoji emoji-id=\"6021443182900812386\">🌎</tg-emoji><b>Регион:</b> {region}\n"
+                       f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Номинал:</b> {amount_value}\n"
+                       f"<tg-emoji emoji-id=\"5255975823436973213\">🎁</tg-emoji><b>Email:</b> <code>{email}</code>")
+        base_price = float(price)
+        commission = round(amount - base_price, 1)
+
+    else:
+        await callback.answer("❌ Ошибка: данные не найдены", show_alert=True)
+        return
 
     payload = f"{ptype}_{user_id}_{int(time.time())}"
 
@@ -1614,22 +1637,12 @@ async def crypto_payment(callback: CallbackQuery):
 
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text=f"Оплатить", url=result["pay_url"])],
-            [InlineKeyboardButton(text="❌Отмена", callback_data=ptype)]
+            [InlineKeyboardButton(text="❌Отмена", callback_data=ptype if ptype != "playstation" else "playstation")]
         ])
 
         # Отправляем с фото
         try:
-            if ptype == "stars":
-                sent = await callback.message.answer_photo(caption=text, reply_markup=keyboard,
-                                                           parse_mode="HTML")
-            elif ptype == "premium":
-                sent = await callback.message.answer_photo(caption=text, reply_markup=keyboard,
-                                                           parse_mode="HTML")
-            elif ptype == "ton":
-                sent = await callback.message.answer_photo(caption=text, reply_markup=keyboard,
-                                                           parse_mode="HTML")
-            else:
-                sent = await callback.message.answer(text, reply_markup=keyboard, parse_mode="HTML")
+            sent = await callback.message.answer_photo(caption=text, reply_markup=keyboard, parse_mode="HTML")
         except:
             sent = await callback.message.answer(text, reply_markup=keyboard, parse_mode="HTML")
 
@@ -1638,54 +1651,12 @@ async def crypto_payment(callback: CallbackQuery):
         # Ошибка
         error_text = f"❌Ошибка: {result.get('error', 'Неизвестная ошибка')}"
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text=" Назад", callback_data=ptype)]
+            [InlineKeyboardButton(text=" Назад", callback_data=ptype if ptype != "playstation" else "playstation")]
         ])
         sent = await callback.message.answer(error_text, reply_markup=keyboard)
         await save_and_delete_previous(user_id, sent.message_id)
 
     await callback.answer()
-
-
-async def track_payment(user_id: int, invoice_id: str, payment_type: str):
-    """Автоматически проверяет оплату каждые 10 секунд"""
-    from username_checker import check_invoice_status
-
-    for _ in range(36):  # 6 минут
-        await asyncio.sleep(10)
-
-        result = await check_invoice_status(invoice_id)
-
-        if result.get("success") and result.get("status") == "paid":
-            try:
-                await bot.send_message(
-                    user_id,
-                    f"✅ <b>Оплата подтверждена!</b>\n\nСпасибо за покупку!\n/menu — вернуться в меню",
-                    parse_mode="HTML"
-                )
-                print(f"✅ Платеж {invoice_id} подтвержден")
-            except:
-                pass
-            break
-
-        if result.get("status") in ["expired", "cancelled"]:
-            break
-
-
-async def check_invoice_status(invoice_id: str):
-    """Проверяет статус счета в CryptoBot"""
-    from username_checker import CRYPTO_TOKEN
-    import aiohttp
-
-    url = "https://pay.crypt.bot/api/getInvoices"
-    headers = {"Crypto-Pay-API-Token": CRYPTO_TOKEN}
-    params = {"invoice_ids": invoice_id}
-
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url, params=params, headers=headers) as resp:
-            data = await resp.json()
-            if data.get("ok") and data["result"]["items"]:
-                return {"status": data["result"]["items"][0]["status"]}
-    return {"status": "unknown"}
 
 
 # ====== SBP =======
@@ -1764,16 +1735,16 @@ async def sbp_payment(callback: CallbackQuery):
         final_amount = round(base_price / 0.92, 1)
 
     elif ptype == "ps" and ps_data:
-    region = ps_data.get('region', '?')
-    amount_value = ps_data.get('amount', '?')
-    price = ps_data.get('price', amount)
-    email = ps_data.get('email', '?')
-    description = (f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> Пополнение PlayStation\n"
-                   f"<tg-emoji emoji-id=\"6021443182900812386\">🌎</tg-emoji><b>Регион:</b> {region}\n"
-                   f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Номинал:</b> {amount_value}\n"
-                   f"<tg-emoji emoji-id=\"5255975823436973213\">🎁</tg-emoji><b>Email:</b> <code>{email}</code>")
-    base_price = float(price)
-    final_amount = round(base_price / 0.92, 1)
+        region = ps_data.get('region', '?')
+        amount_value = ps_data.get('amount', '?')
+        price = ps_data.get('price', amount)
+        email = ps_data.get('email', '?')
+        description = (f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> Пополнение PlayStation\n"
+                       f"<tg-emoji emoji-id=\"6021443182900812386\">🌎</tg-emoji><b>Регион:</b> {region}\n"
+                       f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Номинал:</b> {amount_value}\n"
+                       f"<tg-emoji emoji-id=\"5255975823436973213\">🎁</tg-emoji><b>Email:</b> <code>{email}</code>")
+        base_price = float(price)
+        final_amount = round(base_price / 0.92, 1)
         
 
     else:
