@@ -179,7 +179,7 @@ async def start_cmd(message: Message):
 
 # ===== ПРОВЕРКА ПОДПИСКИ =====
 @router.callback_query(F.data == "check_sub")
-async def check_sub(callback: CallbackQuery):
+async def check_sub(callback: CallbackQuery, state: FSMContext):
     user_ids.add(callback.from_user.id)
     # Удаляем сообщение с кнопкой
     await delete_user_message(callback.from_user.id, callback.message.message_id)
@@ -190,9 +190,8 @@ async def check_sub(callback: CallbackQuery):
 
     # Показываем меню
     await asyncio.sleep(1)
-    await menu_cmd(callback.message)
+    await menu_cmd(callback.message, state)
     await callback.answer()
-
 # ===== ФУНКЦИЯ ПРОВЕРКИ EMAIL ЧЕРЕЗ API =====
 async def check_email_valid(email: str) -> dict:
     """
@@ -217,10 +216,12 @@ async def check_email_valid(email: str) -> dict:
 
 
 # ===== КОМАНДА /MENU =====
-@router.message(Command("menu"))
-async def menu_cmd(message: Message, state: FSMContext):
-    await state.clear()
-    user_ids.add(message.from_user.id)
+@router.callback_query(F.data == "menu")
+async def menu_btn(callback: CallbackQuery, state: FSMContext):
+    if not await require_subscription_callback(callback):
+        return
+    await menu_cmd(callback.message, state)
+    await callback.answer()
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="Купить звёзды", callback_data="stars", icon_custom_emoji_id=5438391541288689158)],
         [InlineKeyboardButton(text="Пополнить TON", callback_data="ton", icon_custom_emoji_id=5438332129006081114)],
@@ -266,18 +267,18 @@ async def info_callback(callback: CallbackQuery, state: FSMContext):
         [InlineKeyboardButton(text="Пользовательское соглашение",
                               url="https://telegra.ph/Polzovatelskoe-soglashenie-03-03-16",
                               icon_custom_emoji_id=6021741567163767583)],
-        [InlineKeyboardButton(text=" Назад", callback_data="back_to_menu",icon_custom_emoji_id=5807899225714858124)],
+        [InlineKeyboardButton(text=" Назад", callback_data="back_to_menu", icon_custom_emoji_id=5807899225714858124)],
     ])
-    # Отправляем сообщение
+    
     try:
         photo = FSInputFile("images/info.jpg")
-        sent_message = await callback.message.answer_photo(photo=photo, caption=text, reply_markup=keyboard)
+        sent_message = await callback.message.answer_photo(photo=photo, caption=text, reply_markup=keyboard, parse_mode="HTML")
     except:
-        sent_message = await callback.message.answer(text, reply_markup=keyboard)
+        sent_message = await callback.message.answer(text, reply_markup=keyboard, parse_mode="HTML")
 
     await save_and_delete_previous(callback.from_user.id, sent_message.message_id)
     await callback.answer()
-
+    
 @router.message(Command("playstation"))
 async def playstation_cmd(message: Message, state: FSMContext):
     if not await check_subscription(message.from_user.id):
@@ -426,10 +427,19 @@ async def ps_amount_handler(callback: CallbackQuery, state: FSMContext):
     
     await state.update_data(region=region, amount=amount, price=price)
     
+    # Названия регионов
+    region_names = {
+        "usa": "🇺🇸 США",
+        "turkey": "🇹🇷 Турция",
+        "poland": "🇵🇱 Польша"
+    }
+    
+    selected_region = region_names.get(region, region.upper())
+    
     text = (
         f"<tg-emoji emoji-id=\"5373306783706137993\">📱</tg-emoji><b>Пополнение PlayStation</b>\n\n"
         f"<tg-emoji emoji-id=\"6021443182900812386\">🌎</tg-emoji><b>Регион:</b> {selected_region}\n"
-        "<tg-emoji emoji-id=\"5447644880824181073\">⚠️</tg-emoji><b>Примечание:</b>\n"
+        f"<tg-emoji emoji-id=\"5447644880824181073\">⚠️</tg-emoji><b>Примечание:</b>\n"
         "<blockquote>"
         "Убедитесь, что ваш почтовый ящик принимает входящие сообщения и письмо не попало в спам."
         "</blockquote>\n\n"
@@ -513,6 +523,12 @@ async def back_to_playstation(callback: CallbackQuery, state: FSMContext):
     if not await require_subscription_callback(callback):
         return
     await playstation_cmd(callback.message, state)
+    await callback.answer()
+@router.callback_query(F.data == "back_to_menu")
+async def back_to_menu(callback: CallbackQuery, state: FSMContext):
+    if not await require_subscription_callback(callback):
+        return
+    await menu_cmd(callback.message, state)
     await callback.answer()
 
 @router.message(Command("steam"))
