@@ -418,40 +418,35 @@ async def ps_amount_handler(callback: CallbackQuery, state: FSMContext):
 # ===== ОБРАБОТЧИК EMAIL =====
 @router.message(StateFilter("waiting_for_ps_email"))
 async def ps_email_handler(message: Message, state: FSMContext):
-    print(f"📧 ПОЛУЧЕНО СООБЩЕНИЕ: {message.text}")
-    print(f"📧 ТЕКУЩЕЕ СОСТОЯНИЕ: {await state.get_state()}")
-    
     await delete_user_message(message.from_user.id, message.message_id)
     
     email = message.text.strip()
-    print(f"📧 EMAIL: {email}")
     
     # Простая проверка формата
     if "@" not in email or "." not in email:
-        print(f"❌ EMAIL НЕ ПРОШЕЛ ПРОВЕРКУ")
         error_msg = await message.answer("❌ Введите корректный email (пример: name@mail.ru)")
         await save_and_delete_previous(message.from_user.id, error_msg.message_id)
         await asyncio.sleep(2)
         await delete_user_message(message.from_user.id, error_msg.message_id)
         return
     
-    print(f"✅ EMAIL ПРОШЕЛ ПРОВЕРКУ")
-    
     # Email прошел проверку
     data = await state.get_data()
-    print(f"📦 DATA ИЗ STATE: {data}")
-    
     region = data.get("region")
     amount = data.get("amount")
     price = data.get("price")
     
-    print(f"📦 region={region}, amount={amount}, price={price}")
+    # Преобразуем price в число
+    try:
+        price_num = float(price)
+    except (ValueError, TypeError):
+        price_num = 0
     
     # Сохраняем данные заказа
     save_user_data(message.from_user.id, "ps_payment", {
         "region": region,
         "amount": amount,
-        "price": price,
+        "price": price_num,
         "email": email
     })
     
@@ -459,22 +454,21 @@ async def ps_email_handler(message: Message, state: FSMContext):
         f"<tg-emoji emoji-id=\"5373306783706137993\">📱</tg-emoji><b>Пополнение PlayStation</b>\n\n"
         f"<b>Регион:</b> {region}\n"
         f"<b>Сумма пополнения:</b> {amount}\n"
-        f"<b>Сумма к оплате:</b> {price}\n"
+        f"<b>Сумма к оплате:</b> {price_num}₽\n"
         f"<b>Email:</b> <code>{email}</code>\n\n"
         f"Выберите способ оплаты:"
     )
     
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="СБП", callback_data=f"sbp_ps_{region}_{amount}_{email}", icon_custom_emoji_id=5305413839066525446)],
-        [InlineKeyboardButton(text="CryptoBot", callback_data=f"crypto_playstation_{round(price / 0.97,1)}", icon_custom_emoji_id=5361914370068613491)],
+        [InlineKeyboardButton(text="CryptoBot", callback_data=f"crypto_playstation_{round(price_num / 0.97, 1)}", icon_custom_emoji_id=5361914370068613491)],
         [InlineKeyboardButton(text="❌Отмена", callback_data="playstation")]
     ])
     
     sent_msg = await message.answer(text, reply_markup=keyboard, parse_mode="HTML")
     await save_and_delete_previous(message.from_user.id, sent_msg.message_id)
     await state.clear()
-    print(f"✅ ОБРАБОТКА ЗАВЕРШЕНА")
-
+    
 # ===== ОБРАБОТЧИК НАЗАД =====
 @router.callback_query(F.data == "playstation")
 async def back_to_playstation(callback: CallbackQuery, state: FSMContext):
