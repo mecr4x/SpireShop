@@ -1676,17 +1676,16 @@ async def sbp_payment(callback: CallbackQuery):
     user_id = callback.from_user.id
     parts = callback.data.split("_")
     
-    print(f"🔍 SBP parts: {parts}")  # Для отладки
+    print(f"🔍 SBP parts: {parts}")
 
     if len(parts) >= 4:
         ptype = parts[1]
-        recipient_type = parts[2]  # self или friend
+        recipient_type = parts[2]
         amount = float(parts[3])
         
-        # Получаем username получателя для подарка (если есть)
         gift_recipient = None
         if len(parts) > 4:
-            gift_recipient = parts[4]
+            gift_recipient = "_".join(parts[4:])
         
         print(f"✅ Тип: {ptype}, Получатель: {recipient_type}, Сумма: {amount}, Подарок для: {gift_recipient}")
     else:
@@ -1694,19 +1693,17 @@ async def sbp_payment(callback: CallbackQuery):
         await callback.answer("❌ Ошибка", show_alert=True)
         return
 
-    # Получаем данные из хранилища
     stars_data = get_user_data(user_id, "stars")
     premium_data = get_user_data(user_id, "premium")
     ton_data = get_user_data(user_id, "ton_purchase")
     steam_data = get_user_data(user_id, "steam")
     ps_data = get_user_data(user_id, "ps_payment")
 
-    # Получаем username покупателя
-    username = callback.from_user.username
-    if not username:
-        username = f"id{user_id}"
+    buyer_username = callback.from_user.username
+    if not buyer_username:
+        buyer_username = f"id{user_id}"
     else:
-        username = f"@{username}"
+        buyer_username = f"@{buyer_username}"
 
     global TON_RUB
 
@@ -1775,15 +1772,11 @@ async def sbp_payment(callback: CallbackQuery):
             f"👇Нажмите кнопку для оплаты, а после подтвердите оплату, нажав на \"<tg-emoji emoji-id=\"5206607081334906820\">✔️</tg-emoji>Оплатил\""
         )
 
-        # Формируем callback_data для кнопки "Оплатил"
         if recipient_type == "friend" and gift_recipient:
-            # Это подарок другу
             paid_callback_data = f"paid_{ptype}_{final_amount}_{gift_recipient}"
         else:
-            # Это покупка себе
-            paid_callback_data = f"paid_{ptype}_{final_amount}_{username}"
+            paid_callback_data = f"paid_{ptype}_{final_amount}_{buyer_username}"
 
-        # Определяем callback для отмены
         if ptype == "ps":
             cancel_callback = "playstation"
         elif ptype == "steam":
