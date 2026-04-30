@@ -1802,7 +1802,6 @@ async def sbp_payment(callback: CallbackQuery):
 # ===== КНОПКА "Я ОПЛАТИЛ" =====
 @router.callback_query(F.data.startswith("paid_"))
 async def paid_callback(callback: CallbackQuery):
-    # 👇 ПРОВЕРКА ПОДПИСКИ
     if not await require_subscription_callback(callback):
         return
 
@@ -1810,18 +1809,12 @@ async def paid_callback(callback: CallbackQuery):
     parts = callback.data.split("_")
 
     if len(parts) >= 4:
-        ptype = parts[1]  # stars, premium, ton, steam, ps
-        amount = parts[2]  # сумма
+        ptype = parts[1]
+        amount = parts[2]
         recipient = parts[3] if len(parts) > 3 else ""
-
-    if len(parts) > 3:
-        recipient = parts[3]  # это username получателя
-    else:
-            recipient = ""
 
         await delete_user_message(user_id, callback.message.message_id)
 
-        # Название товара на русском
         product_names = {
             "stars": "Звёзды",
             "premium": "Premium",
@@ -1831,53 +1824,50 @@ async def paid_callback(callback: CallbackQuery):
         }
         product_name = product_names.get(ptype, ptype.upper())
 
-        # Формируем текст заказа в зависимости от типа
         if ptype == "steam":
-            # Для Steam получаем логин из сохраненных данных
             steam_data = get_user_data(user_id, "steam")
             steam_login = steam_data.get('steam_login', 'Не указан') if steam_data else 'Не указан'
             steam_amount = steam_data.get('steam_amount', amount) if steam_data else amount
 
             order_text = (
-                f"<b>НОВЫЙ ЗАКАЗ</b>\n\n"
-                f"<b>Логин Steam:</b> <code>{steam_login}</code>\n"
-                f"<b>Сумма пополнения:</b> {steam_amount}₽\n"
-                f"<b>Покупатель:</b> {recipient}\n"
-                f"<b>Товар:</b> {product_name}\n"
-                f"<b>Время оплаты:</b> {time.strftime('%Y-%m-%d %H:%M:%S')}"
+                f"НОВЫЙ ЗАКАЗ\n\n"
+                f"Логин Steam: {steam_login}\n"
+                f"Сумма пополнения: {steam_amount}₽\n"
+                f"Покупатель: {recipient}\n"
+                f"Товар: {product_name}\n"
+                f"Время оплаты: {time.strftime('%Y-%m-%d %H:%M:%S')}"
             )
         elif ptype == "ps":
-            # Для PlayStation получаем данные из сохраненных
             ps_data = get_user_data(user_id, "ps_payment")
             if ps_data:
                 region = ps_data.get('region', 'Не указан')
                 ps_amount = ps_data.get('amount', 'Не указан')
                 email = ps_data.get('email', 'Не указан')
                 order_text = (
-                    f"<b>НОВЫЙ ЗАКАЗ</b>\n\n"
-                    f"<b>PlayStation</b>\n"
-                    f"<b>Регион:</b> {region}\n"
-                    f"<b>Номинал:</b> {ps_amount}\n"
-                    f"<b>Email:</b> <code>{email}</code>\n"
-                    f"<b>Покупатель:</b> {recipient}\n"
-                    f"<b>Сумма:</b> {amount}₽\n"
-                    f"<b>Время оплаты:</b> {time.strftime('%Y-%m-%d %H:%M:%S')}"
+                    f"НОВЫЙ ЗАКАЗ\n\n"
+                    f"PlayStation\n"
+                    f"Регион: {region}\n"
+                    f"Номинал: {ps_amount}\n"
+                    f"Email: {email}\n"
+                    f"Покупатель: {recipient}\n"
+                    f"Сумма: {amount}₽\n"
+                    f"Время оплаты: {time.strftime('%Y-%m-%d %H:%M:%S')}"
                 )
             else:
                 order_text = (
-                    f"<b>НОВЫЙ ЗАКАЗ</b>\n\n"
-                    f"<b>PlayStation</b>\n"
-                    f"<b>Покупатель:</b> {recipient}\n"
-                    f"<b>Сумма:</b> {amount}₽\n"
-                    f"<b>Время оплаты:</b> {time.strftime('%Y-%m-%d %H:%M:%S')}"
+                    f"НОВЫЙ ЗАКАЗ\n\n"
+                    f"PlayStation\n"
+                    f"Покупатель: {recipient}\n"
+                    f"Сумма: {amount}₽\n"
+                    f"Время оплаты: {time.strftime('%Y-%m-%d %H:%M:%S')}"
                 )
         else:
             order_text = (
-                f"<b>НОВЫЙ ЗАКАЗ</b>\n\n"
-                f"<b>Получатель:</b> {recipient}\n"
-                f"<b>Товар:</b> {product_name}\n"
-                f"<b>Сумма:</b> {amount}₽\n"
-                f"<b>Время оплаты:</b> {time.strftime('%Y-%m-%d %H:%M:%S')}"
+                f"НОВЫЙ ЗАКАЗ\n\n"
+                f"Получатель: {recipient}\n"
+                f"Товар: {product_name}\n"
+                f"Сумма: {amount}₽\n"
+                f"Время оплаты: {time.strftime('%Y-%m-%d %H:%M:%S')}"
             )
 
         await callback.bot.send_message(
