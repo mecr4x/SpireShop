@@ -645,7 +645,7 @@ async def process_steam_amount(message: Message, state: FSMContext):
         )
 
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="СБП", callback_data=f"sbp_steam_self_{rounf(amount * 1.05 ,1)}", icon_custom_emoji_id=5305413839066525446)],
+            [InlineKeyboardButton(text="СБП", callback_data=f"sbp_steam_self_{round(amount * 1.05 ,1)}", icon_custom_emoji_id=5305413839066525446)],
             [InlineKeyboardButton(text="CryptoBot", callback_data=f"crypto_steam_{round(amount / 0.97, 1)}", icon_custom_emoji_id=5361914370068613491)],
             [InlineKeyboardButton(text="❌Отмена", callback_data="menu")]
         ])
@@ -1700,7 +1700,7 @@ async def sbp_payment(callback: CallbackQuery):
     premium_data = get_user_data(user_id, "premium")
     ton_data = get_user_data(user_id, "ton_purchase")
     steam_data = get_user_data(user_id, "steam")
-    playstation_data= get_user_data(user_id, "playstation")
+    ps_data = get_user_data(user_id, "ps_payment")
 
     # 👇 ПОЛУЧАЕМ USERNAME
     username = callback.from_user.username
@@ -1714,41 +1714,31 @@ async def sbp_payment(callback: CallbackQuery):
 
     # 👇 ЗАДАЁМ НАЧАЛЬНЫЕ ЗНАЧЕНИЯ
     description = f"Оплата {amount}₽"
-    base_price = amount
-    final_amount = amount
+    final_amount = amount  # Платежная система сама добавит комиссию
 
-    # Определяем описание и разделяем цены для каждого типа товара
+    # Определяем описание для каждого типа товара (без пересчета цены)
     if ptype == "stars" and stars_data:
         star_value = stars_data.get('star_value', '?')
         description = f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> {star_value} звёзд"
-        base_price = round(star_value * 1.5, 1)
-        final_amount = round(base_price / 0.92, 1)
+        final_amount = amount
 
     elif ptype == "premium" and premium_data:
         period = premium_data.get('period', 'Premium')
         priceprem = premium_data.get('priceprem', amount)
         description = f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> Telegram Premium на {period}"
-        base_prices = {
-            "12 месяцев": 2799,
-            "6 месяцев": 1499,
-            "3 месяца": 1199
-        }
-        base_price = base_prices.get(period, priceprem)
-        final_amount = round(base_price / 0.92, 1)
+        final_amount = amount
 
     elif ptype == "ton" and ton_data:
         ton_value = ton_data.get('ton_value', '?')
         description = f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> {ton_value} TON"
-        base_price = round(ton_value * (TON_RUB + 20), 1)
-        final_amount = round(base_price / 0.92, 1)
+        final_amount = amount
 
     elif ptype == "steam" and steam_data:
         steam_amount = steam_data.get('steam_amount', amount)
         steam_login = steam_data.get('steam_login', '?')
         description = (f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> Пополнение Steam на {steam_amount}₽\n"
                        f"<tg-emoji emoji-id=\"5255975823436973213\">🎁</tg-emoji><b>Логин:</b> <code>{steam_login}</code>")
-        base_price = float(steam_amount * 1.05)
-        final_amount = round(base_price / 0.92, 1)
+        final_amount = amount
 
     elif ptype == "ps" and ps_data:
         region = ps_data.get('region', '?')
@@ -1759,9 +1749,7 @@ async def sbp_payment(callback: CallbackQuery):
                        f"<tg-emoji emoji-id=\"6021443182900812386\">🌎</tg-emoji><b>Регион:</b> {region}\n"
                        f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Номинал:</b> {amount_value}\n"
                        f"<tg-emoji emoji-id=\"5255975823436973213\">🎁</tg-emoji><b>Email:</b> <code>{email}</code>")
-        base_price = float(price)
-        final_amount = round(base_price / 0.92, 1)
-        
+        final_amount = amount
 
     else:
         await callback.answer("❌ Ошибка: данные не найдены", show_alert=True)
@@ -1787,16 +1775,33 @@ async def sbp_payment(callback: CallbackQuery):
         text = (
             f"<tg-emoji emoji-id=\"5305413839066525446\">🏦</tg-emoji><b>Оплата по СБП</b>\n\n"
             f"{description}\n"
-            f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Сумма к оплате:</b> {round(final_amount, 1)}₽ (комиссия {round(final_amount - base_price, 1)}₽)\n"
-            f"<tg-emoji emoji-id=\"5274099962655816924\">❗️</tg-emoji><b>Комиссия сервиса:</b> 8%\n\n"
+            f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Сумма к оплате:</b> {round(final_amount, 1)}₽\n"
+            f"<tg-emoji emoji-id=\"5274099962655816924\">❗️</tg-emoji><b>Внимание:</b> Платежная система может взимать комиссию\n\n"
             f"👇Нажмите кнопку для оплаты, а после подтвердите оплату, нажав на \"<tg-emoji emoji-id=\"5206607081334906820\">✔️</tg-emoji>Оплатил\""
         )
 
+        # Определяем callback_data для кнопки "Оплатил"
+        if ptype == "ps":
+            paid_callback_data = f"paid_ps_{final_amount}_{username}"
+        elif ptype == "steam":
+            steam_login = steam_data.get('steam_login', '') if steam_data else ''
+            paid_callback_data = f"paid_steam_{steam_login}_{final_amount}_{username}"
+        else:
+            paid_callback_data = f"paid_{ptype}_{final_amount}_{username}"
+
+        # Определяем callback_data для отмены
+        if ptype == "ps":
+            cancel_callback = "playstation"
+        elif ptype == "steam":
+            cancel_callback = "steam"
+        else:
+            cancel_callback = ptype
+
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="Оплатить", url=result["pay_url"])],
-            [InlineKeyboardButton(text="Оплатил", callback_data=f"paid_{ptype}_{final_amount}_{username}",
+            [InlineKeyboardButton(text="Оплатил", callback_data=paid_callback_data,
                                   icon_custom_emoji_id=5206607081334906820)],
-            [InlineKeyboardButton(text="❌Отмена", callback_data=ptype)]
+            [InlineKeyboardButton(text="❌Отмена", callback_data=cancel_callback)]
         ])
 
         sent = await callback.message.answer(text, reply_markup=keyboard, parse_mode="HTML")
@@ -1816,10 +1821,10 @@ async def paid_callback(callback: CallbackQuery):
     user_id = callback.from_user.id
     parts = callback.data.split("_")
 
-    if len(parts) >= 4:  # формат: paid_тип_сумма_получатель
-        ptype = parts[1]  # stars, premium, ton, steam
+    if len(parts) >= 4:
+        ptype = parts[1]  # stars, premium, ton, steam, ps
         amount = parts[2]  # сумма
-        recipient = parts[3]  # получатель (@username или id)
+        recipient = parts[3] if len(parts) > 3 else ""  # получатель
 
         await delete_user_message(user_id, callback.message.message_id)
 
@@ -1828,7 +1833,8 @@ async def paid_callback(callback: CallbackQuery):
             "stars": "Звёзды",
             "premium": "Premium",
             "ton": "TON",
-            "steam": "Steam"
+            "steam": "Steam",
+            "ps": "PlayStation"
         }
         product_name = product_names.get(ptype, ptype.upper())
 
@@ -1840,23 +1846,47 @@ async def paid_callback(callback: CallbackQuery):
             steam_amount = steam_data.get('steam_amount', amount) if steam_data else amount
 
             order_text = (
-                f"💰 <b>НОВЫЙ ЗАКАЗ</b>\n\n"
-                f"🎮 <b>Логин Steam:</b> <code>{steam_login}</code>\n"
-                f"💰 <b>Сумма пополнения:</b> {steam_amount}₽\n"
-                f"👤 <b>Покупатель:</b> {recipient}\n"
-                f"📦 <b>Товар:</b> {product_name}\n"
-                f"⏱ <b>Время оплаты:</b> {time.strftime('%Y-%m-%d %H:%M:%S')}"
+                f"<b>НОВЫЙ ЗАКАЗ</b>\n\n"
+                f"<b>Логин Steam:</b> <code>{steam_login}</code>\n"
+                f"<b>Сумма пополнения:</b> {steam_amount}₽\n"
+                f"<b>Покупатель:</b> {recipient}\n"
+                f"<b>Товар:</b> {product_name}\n"
+                f"<b>Время оплаты:</b> {time.strftime('%Y-%m-%d %H:%M:%S')}"
             )
+        elif ptype == "ps":
+            # Для PlayStation получаем данные из сохраненных
+            ps_data = get_user_data(user_id, "ps_payment")
+            if ps_data:
+                region = ps_data.get('region', 'Не указан')
+                ps_amount = ps_data.get('amount', 'Не указан')
+                email = ps_data.get('email', 'Не указан')
+                order_text = (
+                    f"<b>НОВЫЙ ЗАКАЗ</b>\n\n"
+                    f"<b>PlayStation</b>\n"
+                    f"<b>Регион:</b> {region}\n"
+                    f"<b>Номинал:</b> {ps_amount}\n"
+                    f"<b>Email:</b> <code>{email}</code>\n"
+                    f"<b>Покупатель:</b> {recipient}\n"
+                    f"<b>Сумма:</b> {amount}₽\n"
+                    f"<b>Время оплаты:</b> {time.strftime('%Y-%m-%d %H:%M:%S')}"
+                )
+            else:
+                order_text = (
+                    f"<b>НОВЫЙ ЗАКАЗ</b>\n\n"
+                    f"<b>PlayStation</b>\n"
+                    f"<b>Покупатель:</b> {recipient}\n"
+                    f"<b>Сумма:</b> {amount}₽\n"
+                    f"<b>Время оплаты:</b> {time.strftime('%Y-%m-%d %H:%M:%S')}"
+                )
         else:
             order_text = (
-                f"💰 <b>НОВЫЙ ЗАКАЗ</b>\n\n"
-                f"🎁 <b>Получатель:</b> {recipient}\n"
-                f"📦 <b>Товар:</b> {product_name}\n"
-                f"💵 <b>Сумма:</b> {amount}₽\n"
-                f"⏱ <b>Время оплаты:</b> {time.strftime('%Y-%m-%d %H:%M:%S')}"
+                f"<b>НОВЫЙ ЗАКАЗ</b>\n\n"
+                f"<b>Получатель:</b> {recipient}\n"
+                f"<b>Товар:</b> {product_name}\n"
+                f"<b>Сумма:</b> {amount}₽\n"
+                f"<b>Время оплаты:</b> {time.strftime('%Y-%m-%d %H:%M:%S')}"
             )
 
-        # 👇 ОТПРАВЛЯЕМ ТЕБЕ В ЛИЧКУ
         await callback.bot.send_message(
             chat_id=ADMIN_ID,
             text=order_text,
@@ -1867,7 +1897,8 @@ async def paid_callback(callback: CallbackQuery):
         await callback.message.answer(
             f"<b>Спасибо за покупку!</b>\n\n"
             f"Ваш заказ принят и передан администратору.\n"
-            f"Ждем вас снова в SpireShop<tg-emoji emoji-id=\"5368469082867769478\">😘</tg-emoji>"
+            f"Ждем вас снова в SpireShop<tg-emoji emoji-id=\"5368469082867769478\">😘</tg-emoji>",
+            parse_mode="HTML"
         )
 
         await callback.answer("✅ Заказ отправлен")
