@@ -13,7 +13,6 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.client.default import DefaultBotProperties
-# Создаём роутер
 router = Router()
 
 # ===== ДЛЯ АДМИНКИ =====
@@ -1536,9 +1535,6 @@ async def playstation_btn(callback: CallbackQuery, state: FSMContext):
     await playstation_cmd(callback.message, state)
     await callback.answer()
 
-
-
-
 @router.callback_query(F.data.startswith("crypto_"))
 async def crypto_payment(callback: CallbackQuery):
     if not await require_subscription_callback(callback):
@@ -1547,14 +1543,18 @@ async def crypto_payment(callback: CallbackQuery):
     user_id = callback.from_user.id
     parts = callback.data.split("_")
 
-     if len(parts) >= 3:
-        ptype = parts[1]
-        amount = float(parts[2])
-        
-        # Получаем username получателя для подарка (если есть)
-        gift_recipient = None
-        if len(parts) > 3:
-            gift_recipient = parts[3]
+    if len(parts) < 3:
+        await callback.answer("❌ Ошибка", show_alert=True)
+        return
+
+    ptype = parts[1]
+    amount = float(parts[2])
+    
+    # Получаем получателя для подарка (если есть)
+    gift_recipient = None
+    if len(parts) > 3:
+        gift_recipient = parts[3]
+
 
     ptype = parts[1]  # stars, premium, ton, steam, playstation
     amount = float(parts[2])
