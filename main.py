@@ -1675,27 +1675,33 @@ async def sbp_payment(callback: CallbackQuery):
 
     user_id = callback.from_user.id
     parts = callback.data.split("_")
+    
+    print(f"🔍 SBP parts: {parts}")  # Для отладки
 
     if len(parts) >= 4:
         ptype = parts[1]
         recipient_type = parts[2]  # self или friend
         amount = float(parts[3])
-
+        
+        # Получаем username получателя для подарка (если есть)
         gift_recipient = None
-        if len(parts) > 4 and recipient_type == "friend":
+        if len(parts) > 4:
             gift_recipient = parts[4]
-        print(f"✅ Тип: {ptype}, Получатель: {recipient}, Сумма: {amount}")
+        
+        print(f"✅ Тип: {ptype}, Получатель: {recipient_type}, Сумма: {amount}, Подарок для: {gift_recipient}")
     else:
         print(f"❌ Недостаточно частей: {len(parts)}")
         await callback.answer("❌ Ошибка", show_alert=True)
         return
 
+    # Получаем данные из хранилища
     stars_data = get_user_data(user_id, "stars")
     premium_data = get_user_data(user_id, "premium")
     ton_data = get_user_data(user_id, "ton_purchase")
     steam_data = get_user_data(user_id, "steam")
     ps_data = get_user_data(user_id, "ps_payment")
 
+    # Получаем username покупателя
     username = callback.from_user.username
     if not username:
         username = f"id{user_id}"
@@ -1703,8 +1709,9 @@ async def sbp_payment(callback: CallbackQuery):
         username = f"@{username}"
 
     global TON_RUB
+
     description = f"Оплата {amount}₽"
-    final_amount = amount  
+    final_amount = amount
 
     if ptype == "stars" and stars_data:
         star_value = stars_data.get('star_value', '?')
@@ -1713,7 +1720,6 @@ async def sbp_payment(callback: CallbackQuery):
 
     elif ptype == "premium" and premium_data:
         period = premium_data.get('period', 'Premium')
-        priceprem = premium_data.get('priceprem', amount)
         description = f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> Telegram Premium на {period}"
         final_amount = amount
 
@@ -1739,6 +1745,7 @@ async def sbp_payment(callback: CallbackQuery):
                        f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Номинал:</b> {amount_value}\n"
                        f"<tg-emoji emoji-id=\"5255975823436973213\">🎁</tg-emoji><b>Email:</b> <code>{email}</code>")
         final_amount = amount
+
     else:
         await callback.answer("❌ Ошибка: данные не найдены", show_alert=True)
         return
@@ -1768,16 +1775,15 @@ async def sbp_payment(callback: CallbackQuery):
             f"👇Нажмите кнопку для оплаты, а после подтвердите оплату, нажав на \"<tg-emoji emoji-id=\"5206607081334906820\">✔️</tg-emoji>Оплатил\""
         )
 
-        # Определяем callback_data для кнопки "Оплатил"
-        if ptype == "ps":
-            paid_callback_data = f"paid_ps_{final_amount}_{username}"
-        elif ptype == "steam":
-            steam_login = steam_data.get('steam_login', '') if steam_data else ''
-            paid_callback_data = f"paid_steam_{steam_login}_{final_amount}_{username}"
+        # Формируем callback_data для кнопки "Оплатил"
+        if recipient_type == "friend" and gift_recipient:
+            # Это подарок другу
+            paid_callback_data = f"paid_{ptype}_{final_amount}_{gift_recipient}"
         else:
+            # Это покупка себе
             paid_callback_data = f"paid_{ptype}_{final_amount}_{username}"
 
-        # Определяем callback_data для отмены
+        # Определяем callback для отмены
         if ptype == "ps":
             cancel_callback = "playstation"
         elif ptype == "steam":
@@ -1787,8 +1793,7 @@ async def sbp_payment(callback: CallbackQuery):
 
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="Оплатить", url=result["pay_url"])],
-            [InlineKeyboardButton(text="Оплатил", callback_data=paid_callback_data,
-                                  icon_custom_emoji_id=5206607081334906820)],
+            [InlineKeyboardButton(text="Оплатил", callback_data=paid_callback_data, icon_custom_emoji_id=5206607081334906820)],
             [InlineKeyboardButton(text="❌Отмена", callback_data=cancel_callback)]
         ])
 
