@@ -189,27 +189,24 @@ async def check_sub(callback: CallbackQuery, state: FSMContext):
     await menu_cmd(callback.message, state)
     await callback.answer()
     
-# ===== ФУНКЦИЯ ПРОВЕРКИ EMAIL ЧЕРЕЗ API =====
-async def check_email_valid(email: str) -> dict:
-    """
-    Проверяет email через внешний API
-    Возвращает: {"valid": True/False, "message": "текст"}
-    """
-    try:
-        async with aiohttp.ClientSession() as session:
-            # Бесплатный API для проверки email
-            async with session.get(f"https://emailverification.whoisxmlapi.com/api/v1?apiKey=YOUR_API_KEY&emailAddress={email}", timeout=10) as resp:
-                if resp.status == 200:
-                    data = await resp.json()
-                    if data.get("formatCheck") == "true" and data.get("dnsCheck") == "true":
-                        return {"valid": True, "message": "✅ Email подтвержден"}
-                    else:
-                        return {"valid": False, "message": "❌ Email не существует"}
-    except:
-        pass
+# ===== ФУНКЦИЯ ПРОВЕРКИ EMAIL =====
+async def check_email_api(email: str) -> dict:
+    """Проверяет email (только формат, без внешнего API)"""
+    import re
     
-    # Если API не работает, просто пропускаем проверку
-    return {"valid": True, "message": "✅ Email принят"}
+    # Базовая проверка формата
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    
+    if re.match(pattern, email):
+        return {
+            "valid": True,
+            "message": "✅ Email принят"
+        }
+    else:
+        return {
+            "valid": False,
+            "message": "❌ Неверный формат email"
+        }
 
 
 # ===== КОМАНДА /MENU =====
@@ -759,7 +756,6 @@ async def process_stars_amount(message: Message, state: FSMContext):
 # ===== КНОПКА "КУПИТЬ СЕБЕ" =====
 @router.callback_query(F.data == "buy_stars_self")
 async def buy_stars_self_callback(callback: CallbackQuery):
-    # 👇 ПРОВЕРКА ПОДПИСКИ
     if not await require_subscription_callback(callback):
         return
 
@@ -826,7 +822,6 @@ async def buy_stars_self_callback(callback: CallbackQuery):
 # ===== КНОПКА "ПОДАРИТЬ ДРУГУ" =====
 @router.callback_query(F.data == "gift_stars_friend")
 async def gift_stars_friend_callback(callback: CallbackQuery, state: FSMContext):
-    # 👇 ПРОВЕРКА ПОДПИСКИ
     if not await require_subscription_callback(callback):
         return
 
@@ -864,7 +859,6 @@ async def gift_stars_friend_callback(callback: CallbackQuery, state: FSMContext)
 # ===== ВОЗВРАТ К ВЫБОРУ ПОЛУЧАТЕЛЯ =====
 @router.callback_query(F.data == "back_to_stars_choice")
 async def back_to_stars_choice_callback(callback: CallbackQuery):
-    # 👇 ПРОВЕРКА ПОДПИСКИ
     if not await require_subscription_callback(callback):
         return
 
@@ -961,9 +955,9 @@ async def process_friend_username(message: Message, state: FSMContext):
     )
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="СБП", callback_data=f"sbp_stars_friend_{formulastar}",
+        [InlineKeyboardButton(text="СБП", callback_data=f"sbp_stars_friend_{formulastar}_{username}",
                               icon_custom_emoji_id=5305413839066525446)],
-        [InlineKeyboardButton(text="Cryptobot", callback_data=f"crypto_stars_friend_{round(formulastar / 0.97, 1)}",
+        [InlineKeyboardButton(text="Cryptobot", callback_data=f"crypto_stars_friend_{round(formulastar / 0.97, 1)}_{username}",
                               icon_custom_emoji_id=5361914370068613491)],
         [InlineKeyboardButton(text="❌Отмена", callback_data="back_to_stars_choice")]
     ])
@@ -1202,9 +1196,9 @@ async def process_ton_friend(message: Message, state: FSMContext):
     )
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="СБП", callback_data=f"sbp_ton_friend_{formulaTON}",
+        [InlineKeyboardButton(text="СБП", callback_data=f"sbp_ton_friend_{formulaTON}_{username}",
                               icon_custom_emoji_id=5305413839066525446)],
-        [InlineKeyboardButton(text="CryptoBot", callback_data=f"crypto_ton_{formulaTON}",
+        [InlineKeyboardButton(text="CryptoBot", callback_data=f"crypto_ton_{formulaTON}_{username}",
                               icon_custom_emoji_id=5361914370068613491)],
         [InlineKeyboardButton(text="❌Отмена", callback_data="ton")]
     ])
@@ -1481,9 +1475,9 @@ async def process_premium_friend(message: Message, state: FSMContext):
         )
 
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="СБП", callback_data=f"sbp_premium_friend_{priceprem}",
+            [InlineKeyboardButton(text="СБП", callback_data=f"sbp_premium_friend_{priceprem}_{username}",
                                   icon_custom_emoji_id=5305413839066525446)],
-            [InlineKeyboardButton(text="Cryptobot", callback_data=f"crypto_premium_{round(priceprem / 0.97, 1)}",
+            [InlineKeyboardButton(text="Cryptobot", callback_data=f"crypto_premium_{round(priceprem / 0.97, 1)}_{username}",
                                   icon_custom_emoji_id=5361914370068613491)],
             [InlineKeyboardButton(text="❌Отмена", callback_data="premium")]
         ])
@@ -1553,9 +1547,14 @@ async def crypto_payment(callback: CallbackQuery):
     user_id = callback.from_user.id
     parts = callback.data.split("_")
 
-    if len(parts) < 3:
-        await callback.answer("❌ Ошибка", show_alert=True)
-        return
+     if len(parts) >= 3:
+        ptype = parts[1]
+        amount = float(parts[2])
+        
+        # Получаем username получателя для подарка (если есть)
+        gift_recipient = None
+        if len(parts) > 3:
+            gift_recipient = parts[3]
 
     ptype = parts[1]  # stars, premium, ton, steam, playstation
     amount = float(parts[2])
@@ -1679,8 +1678,12 @@ async def sbp_payment(callback: CallbackQuery):
 
     if len(parts) >= 4:
         ptype = parts[1]
-        recipient = parts[2]
+        recipient_type = parts[2]  # self или friend
         amount = float(parts[3])
+
+        gift_recipient = None
+        if len(parts) > 4 and recipient_type == "friend":
+            gift_recipient = parts[4]
         print(f"✅ Тип: {ptype}, Получатель: {recipient}, Сумма: {amount}")
     else:
         print(f"❌ Недостаточно частей: {len(parts)}")
