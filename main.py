@@ -297,7 +297,7 @@ async def playstation_cmd(message: Message, state: FSMContext):
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="США", callback_data="playstation_usa", icon_custom_emoji_id=5202021044105257611)],
         [InlineKeyboardButton(text="Турция",callback_data="playstation_turkey", icon_custom_emoji_id=5235921989771736755)],
-        [InlineKeyboardButton(text="Польша", callback_data="playstation_polsha", icon_custom_emoji_id=5291847690940852675)],
+        [InlineKeyboardButton(text="Польша", callback_data="playstation_poland", icon_custom_emoji_id=5291847690940852675)],
         [InlineKeyboardButton(text="Назад", callback_data="menu",icon_custom_emoji_id=5807899225714858124)]
     ])
     try:
@@ -1498,7 +1498,13 @@ async def process_premium_friend(message: Message, state: FSMContext):
 
 
 # ===== ОБРАБОТКА КНОПОК МЕНЮ =====
-
+@router.callback_query(F.data == "menu")
+async def menu_btn(callback: CallbackQuery, state: FSMContext):
+    if not await require_subscription_callback(callback):
+        return
+    await menu_cmd(callback.message, state)
+    await callback.answer()
+    
 @router.callback_query(F.data == "steam")
 async def steam_btn(callback: CallbackQuery, state: FSMContext):
     if not await require_subscription_callback(callback):
@@ -1523,10 +1529,10 @@ async def ton_btn(callback: CallbackQuery, state: FSMContext):
 
 
 @router.callback_query(F.data == "premium")
-async def premium_btn(callback: CallbackQuery):
+async def premium_btn(callback: CallbackQuery, state: FSMContext):
     if not await require_subscription_callback(callback):
         return
-    await premium_cmd(callback.message)
+    await premium_cmd(callback.message, state)
     await callback.answer()
 
 @router.callback_query(F.data == "playstation")
@@ -1640,7 +1646,7 @@ async def crypto_payment(callback: CallbackQuery):
 
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text=f"Оплатить", url=result["pay_url"])],
-            [InlineKeyboardButton(text="❌Отмена", callback_data=ptype if ptype != "playstation" else "playstation")]
+            [InlineKeyboardButton(text="❌Отмена", callback_data="playstation")] 
         ])
 
         # Отправляем с фото
@@ -1681,28 +1687,22 @@ async def sbp_payment(callback: CallbackQuery):
         await callback.answer("❌ Ошибка", show_alert=True)
         return
 
-    # 👇 ПОЛУЧАЕМ ДАННЫЕ ИЗ ХРАНИЛИЩА
     stars_data = get_user_data(user_id, "stars")
     premium_data = get_user_data(user_id, "premium")
     ton_data = get_user_data(user_id, "ton_purchase")
     steam_data = get_user_data(user_id, "steam")
     ps_data = get_user_data(user_id, "ps_payment")
 
-    # 👇 ПОЛУЧАЕМ USERNAME
     username = callback.from_user.username
     if not username:
         username = f"id{user_id}"
     else:
         username = f"@{username}"
 
-    # 👇 ГЛОБАЛЬНАЯ ПЕРЕМЕННАЯ КУРСА TON
     global TON_RUB
-
-    # 👇 ЗАДАЁМ НАЧАЛЬНЫЕ ЗНАЧЕНИЯ
     description = f"Оплата {amount}₽"
-    final_amount = amount  # Платежная система сама добавит комиссию
+    final_amount = amount  
 
-    # Определяем описание для каждого типа товара (без пересчета цены)
     if ptype == "stars" and stars_data:
         star_value = stars_data.get('star_value', '?')
         description = f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> {star_value} звёзд"
@@ -1736,7 +1736,6 @@ async def sbp_payment(callback: CallbackQuery):
                        f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Номинал:</b> {amount_value}\n"
                        f"<tg-emoji emoji-id=\"5255975823436973213\">🎁</tg-emoji><b>Email:</b> <code>{email}</code>")
         final_amount = amount
-
     else:
         await callback.answer("❌ Ошибка: данные не найдены", show_alert=True)
         return
