@@ -12,6 +12,7 @@ from aiogram.filters import Command, StateFilter, state
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
+from urllib.parse import quote, unquote
 from aiogram.client.default import DefaultBotProperties
 router = Router()
 
@@ -910,16 +911,13 @@ async def process_friend_username(message: Message, state: FSMContext):
         await delete_user_message(message.from_user.id, error_msg.message_id)
         return
 
-    # ===== ПРОВЕРКА ЧЕРЕЗ username_checker.py =====
     from username_checker import check_username
 
-    # Проверяем существует ли такой username
     check_msg = await message.answer("🔍 Проверяю существование пользователя...")
     result = await check_username(username)
     await delete_user_message(message.from_user.id, check_msg.message_id)
 
     if not result['exists']:
-        # Юзернейм не существует
         error_text = f"❌Указанный пользователь не найден\n\n📥Пользователь: {username}"
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="Попробовать снова", callback_data="gift_stars_friend")]
@@ -929,9 +927,13 @@ async def process_friend_username(message: Message, state: FSMContext):
         await state.clear()
         return
 
-    # Юзернейм существует - продолжаем
     if not username.startswith('@'):
         username = f"@{username}"
+
+    # Кодируем юзернейм для передачи в callback_data
+    encoded_username = quote(username, safe='')
+    print(f"Оригинальный username: {username}")
+    print(f"Закодированный username: {encoded_username}")
 
     user_id = message.from_user.id
     stars_data = get_user_data(user_id, "stars")
@@ -943,7 +945,6 @@ async def process_friend_username(message: Message, state: FSMContext):
 
     star_value = stars_data['star_value']
     formulastar = stars_data['formulastar']
-    star_ton = stars_data.get('formulaTON', stars_data.get('price_ton', 0))
 
     text = (
         f"<tg-emoji emoji-id=\"5438391541288689158\">⭐️</tg-emoji><b>Telegram Stars</b>\n\n"
@@ -954,9 +955,9 @@ async def process_friend_username(message: Message, state: FSMContext):
     )
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="СБП", callback_data=f"sbp_stars_friend_{formulastar}_{username}",
+        [InlineKeyboardButton(text="СБП", callback_data=f"sbp_stars_friend_{formulastar}_{encoded_username}",
                               icon_custom_emoji_id=5305413839066525446)],
-        [InlineKeyboardButton(text="Cryptobot", callback_data=f"crypto_stars_friend_{round(formulastar / 0.97, 1)}_{username}",
+        [InlineKeyboardButton(text="Cryptobot", callback_data=f"crypto_stars_friend_{round(formulastar / 0.97, 1)}_{encoded_username}",
                               icon_custom_emoji_id=5361914370068613491)],
         [InlineKeyboardButton(text="❌Отмена", callback_data="back_to_stars_choice")]
     ])
@@ -1683,11 +1684,17 @@ async def sbp_payment(callback: CallbackQuery):
         recipient_type = parts[2]
         amount = float(parts[3])
         
-        gift_recipient = None
+        gift_recipient_encoded = None
         if len(parts) > 4:
-            gift_recipient = "_".join(parts[4:])
+            gift_recipient_encoded = "_".join(parts[4:])
+            # Декодируем юзернейм
+            gift_recipient = unquote(gift_recipient_encoded)
+        else:
+            gift_recipient = None
         
-        print(f"✅ Тип: {ptype}, Получатель: {recipient_type}, Сумма: {amount}, Подарок для: {gift_recipient}")
+        print(f"✅ Тип: {ptype}, Получатель: {recipient_type}, Сумма: {amount}")
+        print(f"📦 Закодированный подарок для: {gift_recipient_encoded}")
+        print(f"🎁 Декодированный подарок для: {gift_recipient}")
     else:
         print(f"❌ Недостаточно частей: {len(parts)}")
         await callback.answer("❌ Ошибка", show_alert=True)
@@ -1809,6 +1816,7 @@ async def paid_callback(callback: CallbackQuery):
         ptype = parts[1]
         amount = parts[2]
         recipient = parts[3] if len(parts) > 3 else ""
+        recipient = unquote(recipient)  # Декодируем
 
         await delete_user_message(user_id, callback.message.message_id)
 
