@@ -1796,7 +1796,6 @@ async def sbp_payment(callback: CallbackQuery):
         await callback.message.answer(f"❌ Ошибка: {result.get('error')}")
 
     await callback.answer()
-
 # ===== КНОПКА "Я ОПЛАТИЛ" =====
 @router.callback_query(F.data.startswith("paid_"))
 async def paid_callback(callback: CallbackQuery):
