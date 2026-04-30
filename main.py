@@ -6,7 +6,7 @@ if sys.platform == 'win32':
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 import aiohttp
-from aiogram import Bot, Dispatcher, Router, F  # 👈 Router отсюда!
+from aiogram import Bot, Dispatcher, Router, F
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, FSInputFile
 from aiogram.filters import Command, StateFilter, state
 from aiogram.fsm.context import FSMContext
@@ -177,21 +177,18 @@ async def start_cmd(message: Message):
     await save_and_delete_previous(message.from_user.id, sent_message.message_id)
 
 
-# ===== ПРОВЕРКА ПОДПИСКИ =====
 @router.callback_query(F.data == "check_sub")
 async def check_sub(callback: CallbackQuery, state: FSMContext):
     user_ids.add(callback.from_user.id)
-    # Удаляем сообщение с кнопкой
     await delete_user_message(callback.from_user.id, callback.message.message_id)
 
-    # Отправляем подтверждение
     confirm_msg = await callback.message.answer("✅ Подписка подтверждена!")
     await save_and_delete_previous(callback.from_user.id, confirm_msg.message_id)
 
-    # Показываем меню
     await asyncio.sleep(1)
     await menu_cmd(callback.message, state)
     await callback.answer()
+    
 # ===== ФУНКЦИЯ ПРОВЕРКИ EMAIL ЧЕРЕЗ API =====
 async def check_email_valid(email: str) -> dict:
     """
@@ -216,34 +213,31 @@ async def check_email_valid(email: str) -> dict:
 
 
 # ===== КОМАНДА /MENU =====
-@router.callback_query(F.data == "menu")
-async def menu_btn(callback: CallbackQuery, state: FSMContext):
-    if not await require_subscription_callback(callback):
-        return
-    await menu_cmd(callback.message, state)
-    await callback.answer()
+@router.message(Command("menu"))
+async def menu_cmd(message: Message, state: FSMContext):
+    await state.clear()
+    user_ids.add(message.from_user.id)
+    
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="Купить звёзды", callback_data="stars", icon_custom_emoji_id=5438391541288689158)],
         [InlineKeyboardButton(text="Пополнить TON", callback_data="ton", icon_custom_emoji_id=5438332129006081114)],
-        [InlineKeyboardButton(text="Купить Premium", callback_data="premium",
-                              icon_custom_emoji_id=5402352097045795954)],
+        [InlineKeyboardButton(text="Купить Premium", callback_data="premium", icon_custom_emoji_id=5402352097045795954)],
         [
-            InlineKeyboardButton(text="Пополнение Steam", callback_data="steam",icon_custom_emoji_id=5373144051690258848),
+            InlineKeyboardButton(text="Пополнение Steam", callback_data="steam", icon_custom_emoji_id=5373144051690258848),
             InlineKeyboardButton(text="Пополнение PlayStation", callback_data="playstation", icon_custom_emoji_id=5373306783706137993)
         ],
         [
-            InlineKeyboardButton(text="Поддержка", url=f"https://t.me/{SUPPORT_USERNAME[1:]}",
-                                 icon_custom_emoji_id=6021798595739523148),
+            InlineKeyboardButton(text="Поддержка", url=f"https://t.me/{SUPPORT_USERNAME[1:]}", icon_custom_emoji_id=6021798595739523148),
             InlineKeyboardButton(text="Информация", callback_data="info", icon_custom_emoji_id=5258503720928288433)
         ],
-        [InlineKeyboardButton(text="Отзывы", url=f"https://t.me/spireshop01/16", icon_custom_emoji_id=5379673286743449374)],
+        [InlineKeyboardButton(text="Отзывы", url="https://t.me/spireshop01/16", icon_custom_emoji_id=5379673286743449374)],
     ])
 
     try:
         photo = FSInputFile("images/menu.jpg")
-        sent_message = await message.answer_photo(photo=photo, reply_markup=keyboard)
+        sent_message = await message.answer_photo(photo=photo,reply_markup=keyboard, parse_mode="HTML")
     except:
-        sent_message = await message.answer(reply_markup=keyboard)
+        sent_message = await message.answer(reply_markup=keyboard, parse_mode="HTML")
 
     await save_and_delete_previous(message.from_user.id, sent_message.message_id)
 
@@ -1130,7 +1124,6 @@ async def ton_self_callback(callback: CallbackQuery):
 # ===== ПОДАРИТЬ ДРУГУ =====
 @router.callback_query(F.data == "gift_ton_friend")
 async def ton_friend_callback(callback: CallbackQuery, state: FSMContext):
-    # 👇 ПРОВЕРКА ПОДПИСКИ
     if not await require_subscription_callback(callback):
         return
 
@@ -1505,12 +1498,6 @@ async def process_premium_friend(message: Message, state: FSMContext):
 
 
 # ===== ОБРАБОТКА КНОПОК МЕНЮ =====
-@router.callback_query(F.data == "menu")
-async def menu_btn(callback: CallbackQuery):
-    if not await require_subscription_callback(callback):
-        return
-    await menu_cmd(callback.message)
-    await callback.answer()
 
 @router.callback_query(F.data == "steam")
 async def steam_btn(callback: CallbackQuery, state: FSMContext):
@@ -1678,7 +1665,6 @@ async def crypto_payment(callback: CallbackQuery):
 # ====== SBP =======
 @router.callback_query(F.data.startswith("sbp_"))
 async def sbp_payment(callback: CallbackQuery):
-    # 👇 ПРОВЕРКА ПОДПИСКИ
     if not await require_subscription_callback(callback):
         return
 
