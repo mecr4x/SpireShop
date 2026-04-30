@@ -1812,7 +1812,12 @@ async def paid_callback(callback: CallbackQuery):
     if len(parts) >= 4:
         ptype = parts[1]  # stars, premium, ton, steam, ps
         amount = parts[2]  # сумма
-        recipient = parts[3] if len(parts) > 3 else ""  # получатель
+        recipient = parts[3] if len(parts) > 3 else ""
+
+    if len(parts) > 3:
+        recipient = parts[3]  # это username получателя
+    else:
+            recipient = ""
 
         await delete_user_message(user_id, callback.message.message_id)
 
