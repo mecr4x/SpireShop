@@ -373,29 +373,6 @@ async def playstation_region_handler(callback: CallbackQuery, state: FSMContext)
     await callback.message.edit_text(text, reply_markup=keyboard, parse_mode="HTML")
     await callback.answer()
 
-
-# ===== ФУНКЦИЯ ПРОВЕРКИ EMAIL ЧЕРЕЗ API =====
-async def check_email_api(email: str) -> dict:
-    """Проверяет email через бесплатное API"""
-    url = f"https://rapid-email-verifier.fly.dev/api/validate?email={email}"
-    
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, timeout=10) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    is_valid = data.get("status") == "valid"
-                    return {
-                        "valid": is_valid,
-                        "message": "✅ Email подтвержден" if is_valid else "❌ Email не существует"
-                    }
-                else:
-                    return {"valid": True, "message": "✅ Проверка пропущена"}
-    except Exception as e:
-        print(f"Ошибка проверки email: {e}")
-        return {"valid": True, "message": "✅ Проверка пропущена"}
-
-
 # ===== ВЫБОР НОМИНАЛА =====
 @router.callback_query(F.data.startswith("ps_amount_"))
 async def ps_amount_handler(callback: CallbackQuery, state: FSMContext):
@@ -438,7 +415,7 @@ async def ps_amount_handler(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
 
 
-# ===== ОБРАБОТЧИК EMAIL С ПРОВЕРКОЙ =====
+# ===== ОБРАБОТЧИК EMAIL =====
 @router.message(StateFilter("waiting_for_ps_email"))
 async def ps_email_handler(message: Message, state: FSMContext):
     await delete_user_message(message.from_user.id, message.message_id)
@@ -453,10 +430,38 @@ async def ps_email_handler(message: Message, state: FSMContext):
         await delete_user_message(message.from_user.id, error_msg.message_id)
         return
     
-    # Проверка через API
-    status_msg = await message.answer("🔍 Проверяю email...")
-    result = await check_email_api(email)
-    await delete_user_message(message.from_user.id, status_msg.message_id)
+    # Email прошел проверку (без API)
+    data = await state.get_data()
+    region = data.get("region")
+    amount = data.get("amount")
+    price = data.get("price")
+    
+    # Сохраняем данные заказа
+    save_user_data(message.from_user.id, "ps_payment", {
+        "region": region,
+        "amount": amount,
+        "price": price,
+        "email": email
+    })
+    
+    text = (
+        f"<tg-emoji emoji-id=\"5373306783706137993\">📱</tg-emoji><b>Пополнение PlayStation</b>\n\n"
+        f"<b>Регион:</b> {region}\n"
+        f"<b>Сумма пополнения:</b> {amount}\n"
+        f"<b>Сумма к оплате:</b> {price}\n"
+        f"<b>Email:</b> <code>{email}</code>\n\n"
+        f"Выберите способ оплаты:"
+    )
+    
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="СБП", callback_data=f"sbp_ps_{region}_{amount}_{email}", icon_custom_emoji_id=5305413839066525446)],
+        [InlineKeyboardButton(text="CryptoBot", callback_data=f"crypto_playstation_{round(price / 0.97,1)}", icon_custom_emoji_id=5361914370068613491)],
+        [InlineKeyboardButton(text="❌Отмена", callback_data="playstation")]
+    ])
+    
+    sent_msg = await message.answer(text, reply_markup=keyboard, parse_mode="HTML")
+    await save_and_delete_previous(message.from_user.id, sent_msg.message_id)
+    await state.clear()
     
     if not result["valid"]:
         error_msg = await message.answer(f"{result['message']}\n\nПопробуйте другой email:")
