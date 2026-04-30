@@ -1705,10 +1705,10 @@ async def sbp_payment(callback: CallbackQuery):
         region = ps_data.get('region', '?')
         amount_value = ps_data.get('amount', '?')
         email = ps_data.get('email', '?')
-        description = (f"<tg-emoji emoji-id=\"5954135079662916434\">⭐️</tg-emoji><b>Вы выбрали:</b> Пополнение PlayStation\n"
-                       f"<tg-emoji emoji-id=\"6021443182900812386\">🌎</tg-emoji><b>Регион:</b> {region}\n"
-                       f"<tg-emoji emoji-id=\"5224257782013769471\">💰</tg-emoji><b>Номинал:</b> {amount_value}\n"
-                       f"<tg-emoji emoji-id=\"5255975823436973213\">🎁</tg-emoji><b>Email:</b> <code>{email}</code>")
+        description = (f"<b>Вы выбрали:</b> Пополнение PlayStation\n"
+                       f"<b>Регион:</b> {region}\n"
+                       f"<b>Номинал:</b> {amount_value}\n"
+                       f"<b>Email:</b> <code>{email}</code>")
     else:
         await callback.answer("❌ Ошибка: данные не найдены", show_alert=True)
         return
